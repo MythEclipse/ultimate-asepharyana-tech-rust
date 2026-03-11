@@ -1,7 +1,9 @@
 use crate::helpers::parse_html;
-use crate::helpers::scraping::{attr, attr_from, attr_from_or, extract_slug, selector, text, text_from_or};
-use scraper::{Html, Selector};
+use crate::helpers::scraping::{
+    attr, attr_from, attr_from_or, extract_slug, selector, text, text_from_or,
+};
 use crate::models::anime2::*;
+use scraper::{Html, Selector};
 
 // ============================================================================
 // SELECTORS
@@ -48,6 +50,10 @@ impl Default for AnimeSelectors {
     }
 }
 
+// Global lazy static instance for selectors to avoid reallocation per parse
+use once_cell::sync::Lazy;
+static ANIME_SELECTORS: Lazy<AnimeSelectors> = Lazy::new(|| AnimeSelectors::new());
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -70,7 +76,7 @@ pub fn parse_ongoing_anime(
     html: &str,
 ) -> Result<Vec<OngoingAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -102,7 +108,7 @@ pub fn parse_ongoing_anime_with_score(
     html: &str,
 ) -> Result<Vec<OngoingAnimeItemWithScore>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -133,7 +139,7 @@ pub fn parse_complete_anime(
     html: &str,
 ) -> Result<Vec<CompleteAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -165,7 +171,7 @@ pub fn parse_latest_anime(
     html: &str,
 ) -> Result<Vec<LatestAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -198,7 +204,7 @@ pub fn parse_search_anime(
     html: &str,
 ) -> Result<Vec<SearchAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -238,7 +244,7 @@ pub fn parse_genre_anime(
     html: &str,
 ) -> Result<Vec<GenreAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = AnimeSelectors::new();
+    let selectors = &*ANIME_SELECTORS;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -306,7 +312,10 @@ pub fn parse_pagination(document: &Html, current_page: u32) -> Pagination {
 }
 
 /// Parse pagination with string-based page numbers (for search results)
-pub fn parse_pagination_with_string(document: &Html, current_page: u32) -> PaginationWithStringPages {
+pub fn parse_pagination_with_string(
+    document: &Html,
+    current_page: u32,
+) -> PaginationWithStringPages {
     let pagination_selector = selector(".pagination .page-numbers:not(.next)").unwrap();
     let next_selector = selector(".pagination .next").unwrap();
 

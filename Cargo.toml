@@ -156,3 +156,12 @@ incremental = false     # Disable incremental untuk optimasi penuh
 debug = false           # No debug info untuk binary lebih kecil
 strip = true            # Strip symbols untuk binary lebih kecil
 panic = "abort"         # Abort on panic (binary lebih kecil dan lebih cepat)
+overflow-checks = false # Non-overflowing arithmetic for speed (disable in debug)
+
+# Optimize dependencies too
+[profile.dev]
+opt-level = 0
+
+[profile.bench]
+opt-level = 3
+lto = "fat"

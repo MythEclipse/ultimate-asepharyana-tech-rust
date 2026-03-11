@@ -1,17 +1,35 @@
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::helpers::scraping::{selector, text_from_or, attr_from_or, text, attr};
+use crate::helpers::scraping::{attr, attr_from_or, selector, text, text_from_or};
+use crate::helpers::{fetch_html_with_retry, internal_err, parse_html, Cache};
 use crate::routes::AppState;
 use crate::scraping::urls::get_komik_api_url;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json, Router};
 
+use once_cell::sync::Lazy;
 use regex::Regex;
+
+// Static selectors to avoid parsing on each request
+static ITEM_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("article, .ls4, .ls2").unwrap());
+static TITLE_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("h3 a, h4 a").unwrap());
+static IMG_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("img.lazy, img").unwrap());
+static SCORE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector(".up, .numscore, .epx").unwrap());
+static CHAPTER_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector(".ls4s a, .ls24, .ls2l a, .new1 a").unwrap());
+static TYPE_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector(".ls3p, .type").unwrap());
+static LINK_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("h3 a, h4 a, a").unwrap());
+static PAGINATION_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector(".paging a, .pagination a:not(.next)").unwrap());
+static NEXT_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector(".paging a.next, .pagination .next").unwrap());
+static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap());
+
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{info};
+use tracing::info;
 use utoipa::ToSchema;
-
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct PopularKomikItem {
@@ -146,16 +164,16 @@ fn parse_popular_page(
     let mut komik_list = Vec::new();
     let mut rank: u32 = ((current_page - 1) * 20) + 1;
 
-    let item_selector = selector("article, .ls4, .ls2").unwrap();
-    let title_selector = selector("h3 a, h4 a").unwrap();
-    let img_selector = selector("img.lazy, img").unwrap();
-    let score_selector = selector(".up, .numscore, .epx").unwrap();
-    let chapter_selector = selector(".ls4s a, .ls24, .ls2l a, .new1 a").unwrap();
-    let type_selector = selector(".ls3p, .type").unwrap();
-    let link_selector = selector("h3 a, h4 a, a").unwrap();
-    let pagination_selector = selector(".paging a, .pagination a:not(.next)").unwrap();
-    let next_selector = selector(".paging a.next, .pagination .next").unwrap();
-    let slug_regex = Regex::new(r"/([^/]+)/?$").unwrap();
+    let item_selector = &*ITEM_SELECTOR;
+    let title_selector = &*TITLE_SELECTOR;
+    let img_selector = &*IMG_SELECTOR;
+    let score_selector = &*SCORE_SELECTOR;
+    let chapter_selector = &*CHAPTER_SELECTOR;
+    let type_selector = &*TYPE_SELECTOR;
+    let link_selector = &*LINK_SELECTOR;
+    let pagination_selector = &*PAGINATION_SELECTOR;
+    let next_selector = &*NEXT_SELECTOR;
+    let slug_regex = &*SLUG_REGEX;
 
     for element in document.select(&item_selector) {
         let title = text_from_or(&element, &title_selector, "");
@@ -200,12 +218,7 @@ fn parse_popular_page(
     let last_visible_page = document
         .select(&pagination_selector)
         .next_back()
-        .map(|e| {
-            text(&e)
-                .trim()
-                .parse::<u32>()
-                .unwrap_or(1)
-        })
+        .map(|e| text(&e).trim().parse::<u32>().unwrap_or(1))
         .unwrap_or(1);
 
     let has_next_page = document.select(&next_selector).next().is_some();

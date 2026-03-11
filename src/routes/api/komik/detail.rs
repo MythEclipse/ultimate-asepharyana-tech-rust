@@ -1,10 +1,10 @@
 //! Handler for the detail endpoint.
 
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::services::images::cache::get_cached_or_original;
-use crate::helpers::scraping::{selector, text_from_or, text, attr};
+use crate::helpers::scraping::{attr, selector, text, text_from_or};
+use crate::helpers::{fetch_html_with_retry, internal_err, parse_html, Cache};
 use crate::routes::AppState;
 use crate::scraping::urls::get_komik_url;
+use crate::services::images::cache::get_cached_or_original;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -23,6 +23,29 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
+
+// Static selectors to avoid parsing on each request
+static TD_LAST_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("td:last-child").unwrap());
+static TITLE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div#Judul h1 span[itemprop=\"name\"]").unwrap());
+static H1_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("h1").unwrap());
+static TITLE_TAG_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("title").unwrap());
+static INFO_ROW_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("table.inftable tr").unwrap());
+static POSTER_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("section#Informasi .ims img").unwrap());
+static DESC_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("p.desc").unwrap());
+static CHAPTER_LIST_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("tbody#daftarChapter tr").unwrap());
+static DATE_LINK_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("td.tanggalseries").unwrap());
+static JUDUL2_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("div.judul2").unwrap());
+static GENRE_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("ul.genre li a").unwrap());
+static CHAPTER_LINK_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("td.judulseries a").unwrap());
+static CHAPTER_TITLE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(?:chapter|ch\.?)\s*([\d\.]+)").unwrap());
+static CHAPTER_NUMBER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\d\.]+)").unwrap());
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct Chapter {
@@ -72,21 +95,17 @@ pub struct DetailQuery {
     pub komik_id: Option<String>,
 }
 
-static CHAPTER_TITLE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)(?:chapter|ch\.?)\s*([\d\.]+)").unwrap());
-static CHAPTER_NUMBER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\d\.]+)").unwrap());
-
 // Helper function to find table rows containing specific text
 fn find_table_row_with_text<'a>(
-    info_rows: &[scraper::ElementRef<'a>], 
+    info_rows: &[scraper::ElementRef<'a>],
     text_fragments: &[&str],
 ) -> Option<String> {
     let lower_text_fragments: Vec<String> =
         text_fragments.iter().map(|&s| s.to_lowercase()).collect();
-    let td_last_selector = selector("td:last-child").unwrap();
+    let td_last_selector = &*TD_LAST_SELECTOR;
 
     info_rows
-        .iter() 
+        .iter()
         .find(|row| {
             let row_text = text(row).to_lowercase();
             lower_text_fragments
@@ -94,7 +113,10 @@ fn find_table_row_with_text<'a>(
                 .any(|fragment| row_text.contains(fragment))
         })
         .and_then(|row| {
-            text_from_or(row, &td_last_selector, "").trim().to_string().into()
+            text_from_or(row, td_last_selector, "")
+                .trim()
+                .to_string()
+                .into()
         })
 }
 
@@ -153,12 +175,11 @@ async fn fetch_komik_detail(
     komik_id: String,
 ) -> Result<DetailData, Box<dyn std::error::Error + Send + Sync>> {
     let base_url = get_komik_url();
-    let url = format!("{}/manga/{}/", base_url, komik_id); 
+    let url = format!("{}/manga/{}/", base_url, komik_id);
 
     let html = fetch_html_with_retry(&url).await?;
 
-    tokio::task::spawn_blocking(move || parse_komik_detail_document(&html))
-        .await?
+    tokio::task::spawn_blocking(move || parse_komik_detail_document(&html)).await?
 }
 
 fn parse_komik_detail_document(
@@ -166,7 +187,7 @@ fn parse_komik_detail_document(
 ) -> Result<DetailData, Box<dyn std::error::Error + Send + Sync>> {
     let start_time = std::time::Instant::now();
     info!("Starting to parse komik detail document");
-    
+
     let document = parse_html(html);
 
     // Helper function to clean and format extracted text
@@ -194,17 +215,17 @@ fn parse_komik_detail_document(
         clean_text(full_text[default_index..].to_string())
     }
 
-    let title_selector = selector("div#Judul h1 span[itemprop=\"name\"]").unwrap();
-    let h1_selector = selector("h1").unwrap();
-    let title_tag_selector = selector("title").unwrap();
-    let info_row_selector = selector("table.inftable tr").unwrap();
-    let poster_selector = selector("section#Informasi .ims img").unwrap();
-    let desc_selector = selector("p.desc").unwrap();
-    let chapter_list_selector = selector("tbody#daftarChapter tr").unwrap();
-    let date_link_selector = selector("td.tanggalseries").unwrap();
-    let judul2_selector = selector("div.judul2").unwrap();
-    let genre_selector = selector("ul.genre li a").unwrap();
-    let chapter_link_selector = selector("td.judulseries a").unwrap();
+    let title_selector = &*TITLE_SELECTOR;
+    let h1_selector = &*H1_SELECTOR;
+    let title_tag_selector = &*TITLE_TAG_SELECTOR;
+    let info_row_selector = &*INFO_ROW_SELECTOR;
+    let poster_selector = &*POSTER_SELECTOR;
+    let desc_selector = &*DESC_SELECTOR;
+    let chapter_list_selector = &*CHAPTER_LIST_SELECTOR;
+    let date_link_selector = &*DATE_LINK_SELECTOR;
+    let judul2_selector = &*JUDUL2_SELECTOR;
+    let genre_selector = &*GENRE_SELECTOR;
+    let chapter_link_selector = &*CHAPTER_LINK_SELECTOR;
 
     // Improved title extraction with fallback options
     let title = document
@@ -229,24 +250,19 @@ fn parse_komik_detail_document(
         })
         .or_else(|| {
             // Final fallback to document title
-            document
-                .select(&title_tag_selector)
-                .next()
-                .map(|e| {
-                    let text = clean_text(text(&e));
-                    if text.contains("Komik ") {
-                        text.replace("Komik ", "").trim().to_string()
-                    } else {
-                        text.trim().to_string()
-                    }
-                })
+            document.select(&title_tag_selector).next().map(|e| {
+                let text = clean_text(text(&e));
+                if text.contains("Komik ") {
+                    text.replace("Komik ", "").trim().to_string()
+                } else {
+                    text.trim().to_string()
+                }
+            })
         })
         .unwrap_or_default();
 
-    let info_rows_vec: Vec<scraper::ElementRef> = document
-        .select(&info_row_selector)
-        .collect();
-    let info_rows = &info_rows_vec[..]; 
+    let info_rows_vec: Vec<scraper::ElementRef> = document.select(&info_row_selector).collect();
+    let info_rows = &info_rows_vec[..];
 
     let status = info_rows
         .iter()
@@ -336,10 +352,7 @@ fn parse_komik_detail_document(
             document
                 .select(&chapter_list_selector)
                 .next_back()
-                .and_then(|last| {
-                    last.select(&date_link_selector)
-                        .next()
-                })
+                .and_then(|last| last.select(&date_link_selector).next())
                 .map(|e| clean_text(text(&e)))
                 .unwrap_or_default()
         });
@@ -347,9 +360,7 @@ fn parse_komik_detail_document(
     let total_chapter = find_table_row_with_text(info_rows, &["total chapter", "total chapters"])
         .unwrap_or_else(|| {
             // Fallback to chapter count if no specific total found
-            let count = document
-                .select(&chapter_list_selector)
-                .count();
+            let count = document.select(&chapter_list_selector).count();
             if count > 0 {
                 count.to_string()
             } else {
@@ -360,25 +371,18 @@ fn parse_komik_detail_document(
     let updated_on = find_table_row_with_text(info_rows, &["diperbarui", "updated"])
         .or_else(|| {
             // Look for updated date in the "judul2" class which contains "pembaca • X waktu lalu"
-            document
-                .select(&judul2_selector)
-                .next()
-                .map(|e| {
-                    let text_str = clean_text(text(&e));
-                    // Extract the part after "• " which contains the time information
-                    text_str.split("• ").nth(1).unwrap_or("").trim().to_string()
-                })
+            document.select(&judul2_selector).next().map(|e| {
+                let text_str = clean_text(text(&e));
+                // Extract the part after "• " which contains the time information
+                text_str.split("• ").nth(1).unwrap_or("").trim().to_string()
+            })
         })
         .unwrap_or_else(|| {
             // Fallback to first chapter date if no specific updated date found
             document
                 .select(&chapter_list_selector)
                 .next()
-                .and_then(|first| {
-                    first
-                        .select(&date_link_selector)
-                        .next()
-                })
+                .and_then(|first| first.select(&date_link_selector).next())
                 .map(|e| clean_text(text(&e)))
                 .unwrap_or_default()
         });
@@ -395,12 +399,8 @@ fn parse_komik_detail_document(
     let raw_chapter_data: Vec<(String, String, String)> = document
         .select(&chapter_list_selector)
         .filter_map(|el| {
-            let chapter_link_element = el
-                .select(&chapter_link_selector)
-                .next();
-            let date_element = el
-                .select(&date_link_selector)
-                .next();
+            let chapter_link_element = el.select(&chapter_link_selector).next();
+            let date_element = el.select(&date_link_selector).next();
 
             let chapter_text = chapter_link_element
                 .as_ref()
@@ -413,7 +413,6 @@ fn parse_komik_detail_document(
 
             let href_text = chapter_link_element
                 .and_then(|e| attr(&e, "href"))
-
                 .unwrap_or_default();
 
             if !chapter_text.is_empty() || !date_text.is_empty() || !href_text.is_empty() {
@@ -606,7 +605,7 @@ async fn handle_socket(mut socket: WebSocket, app_state: Arc<AppState>) {
                         if socket
                             .send(Message::Text(
                                 serde_json::to_string(&error_event).unwrap().into(),
-                              ))
+                            ))
                             .await
                             .is_err()
                         {

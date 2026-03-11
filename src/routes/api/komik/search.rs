@@ -1,17 +1,44 @@
-use crate::helpers::{internal_err, parse_html, Cache, fetch_html_with_retry};
-use crate::helpers::scraping::{selector, text_from_or, attr_from, attr_from_or, text};
+use crate::helpers::scraping::{attr_from, attr_from_or, selector, text, text_from_or};
+use crate::helpers::{fetch_html_with_retry, internal_err, parse_html, Cache};
 
 use crate::routes::AppState;
 use crate::scraping::urls::get_komik_api_url;
 use axum::http::StatusCode;
 use axum::{extract::Query, response::IntoResponse, Json, Router};
 
-
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
 use utoipa::ToSchema;
 
+// Static selectors to avoid parsing on each request
+static ANIMPOST_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.bge, .listupd .bge").unwrap());
+static TITLE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.kan h3, div.kan a h3, .tt h3").unwrap());
+static IMG_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("div.bgei img").unwrap());
+static CHAPTER_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.new1 a span:last-child, .new1 span, .lch").unwrap());
+static SCORE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector(".up, .epx, .numscore").unwrap());
+static DATE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.kan span.judul2, .mdis .date").unwrap());
+static TYPE_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.tpe1_inf b, .tpe1_inf span.type, .mdis .type").unwrap());
+static LINK_SELECTOR: Lazy<scraper::Selector> =
+    Lazy::new(|| selector("div.bgei a, div.kan a").unwrap());
+static NEXT_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| {
+    selector(".pagination > a.next, .pagination > .next.page-numbers, .hpage .next").unwrap()
+});
+static PREV_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| {
+    selector(".pagination > a.prev, .pagination > .prev.page-numbers, .hpage .prev").unwrap()
+});
+static PAGE_SELECTORS: Lazy<scraper::Selector> = Lazy::new(|| {
+    selector(".pagination > a, .pagination > .page-numbers:not(.next):not(.prev), .hpage a")
+        .unwrap()
+});
+static SLUG_REGEX: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new(r"/([^/]+)/?$").unwrap());
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MangaItem {
@@ -132,10 +159,8 @@ async fn fetch_and_parse_search(
     page: u32,
 ) -> Result<(Vec<MangaItem>, Pagination), Box<dyn std::error::Error + Send + Sync>> {
     let html = fetch_html_with_retry(url).await?;
-    let (data, pagination) = tokio::task::spawn_blocking(move || {
-        parse_search_document(&html, page)
-    })
-    .await??;
+    let (data, pagination) =
+        tokio::task::spawn_blocking(move || parse_search_document(&html, page)).await??;
 
     Ok((data, pagination))
 }
@@ -147,17 +172,17 @@ fn parse_search_document(
     let document = parse_html(html);
     let mut data = Vec::new();
 
-    let animpost_selector = selector("div.bge, .listupd .bge").unwrap();
-    let title_selector = selector("div.kan h3, div.kan a h3, .tt h3").unwrap();
-    let img_selector = selector("div.bgei img").unwrap();
-    let chapter_selector = selector("div.new1 a span:last-child, .new1 span, .lch").unwrap();
-    let score_selector = selector(".up, .epx, .numscore").unwrap();
-    let date_selector = selector("div.kan span.judul2, .mdis .date").unwrap();
-    let type_selector = selector("div.tpe1_inf b, .tpe1_inf span.type, .mdis .type").unwrap();
-    let link_selector = selector("div.bgei a, div.kan a").unwrap();
-    let next_selector = selector(".pagination > a.next, .pagination > .next.page-numbers, .hpage .next").unwrap();
-    let prev_selector = selector(".pagination > a.prev, .pagination > .prev.page-numbers, .hpage .prev").unwrap();
-    let page_selectors = selector(".pagination > a, .pagination > .page-numbers:not(.next):not(.prev), .hpage a").unwrap();
+    let animpost_selector = &*ANIMPOST_SELECTOR;
+    let title_selector = &*TITLE_SELECTOR;
+    let img_selector = &*IMG_SELECTOR;
+    let chapter_selector = &*CHAPTER_SELECTOR;
+    let score_selector = &*SCORE_SELECTOR;
+    let date_selector = &*DATE_SELECTOR;
+    let type_selector = &*TYPE_SELECTOR;
+    let link_selector = &*LINK_SELECTOR;
+    let next_selector = &*NEXT_SELECTOR;
+    let prev_selector = &*PREV_SELECTOR;
+    let page_selectors = &*PAGE_SELECTORS;
 
     for element in document.select(&animpost_selector) {
         let title = text_from_or(&element, &title_selector, "");
