@@ -61,7 +61,6 @@ rayon = "1.11"
 tl = "0.7.8"
 tower = { version = "0.5", features = ["make"] }
 scraper = "0.25.0"
-failure = "0.1"
 flate2 = "1.1"
 redis = { version = "0.32.7", features = ["tokio-rustls-comp"] }
 thiserror = "2.0.18"

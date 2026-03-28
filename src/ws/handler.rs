@@ -73,20 +73,25 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
         }
     });
 
+    // Track which rooms this user actually joins to avoid O(N) global loop on disconnect
+    let joined_rooms: Arc<std::sync::Mutex<std::collections::HashSet<String>>> = 
+        Arc::new(std::sync::Mutex::new(std::collections::HashSet::new()));
+
     // Handle incoming messages
     let tx_clone = tx.clone();
     let user_id_clone = user_id.clone();
     let state_clone = state.clone();
+    let joined_rooms_clone = joined_rooms.clone();
 
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Text(text) => {
-                    handle_message(&text, &user_id_clone, &tx_clone, &state_clone).await;
+                    handle_message(&text, &user_id_clone, &tx_clone, &state_clone, &joined_rooms_clone).await;
                 }
                 Message::Binary(data) => {
                     if let Ok(text) = String::from_utf8(data.to_vec()) {
-                        handle_message(&text, &user_id_clone, &tx_clone, &state_clone).await;
+                        handle_message(&text, &user_id_clone, &tx_clone, &state_clone, &joined_rooms_clone).await;
                     }
                 }
                 Message::Ping(_) => {
@@ -109,8 +114,13 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
         _ = &mut recv_task => send_task.abort(),
     }
 
-    // Cleanup: remove from all rooms
-    for room_name in state.rooms.list_rooms() {
+    // Cleanup: remove from explicitly tracked rooms only
+    let rooms_to_clean: Vec<String> = {
+        let guard = joined_rooms.lock().unwrap();
+        guard.iter().cloned().collect()
+    };
+    
+    for room_name in rooms_to_clean {
         if let Some(room) = state.rooms.get(&room_name) {
             room.leave(&user_id);
             state.rooms.remove_if_empty(&room_name);
@@ -125,6 +135,7 @@ async fn handle_message(
     user_id: &str,
     tx: &broadcast::Sender<String>,
     state: &WsState,
+    joined_rooms: &std::sync::Mutex<std::collections::HashSet<String>>,
 ) {
     let msg = match WsMessage::from_json(text) {
         Ok(m) => m,
@@ -143,6 +154,11 @@ async fn handle_message(
             if let Some(room_name) = msg.room {
                 let room = state.rooms.get_or_create(&room_name);
                 room.join(user_id, tx.clone());
+                
+                // Track explicitly
+                {
+                    joined_rooms.lock().unwrap().insert(room_name.clone());
+                }
 
                 let response = WsMessage::new(
                     WsEvent::Join,
@@ -157,6 +173,11 @@ async fn handle_message(
         }
         WsEvent::Leave => {
             if let Some(room_name) = msg.room {
+                // Untrack explicitly
+                {
+                    joined_rooms.lock().unwrap().remove(&room_name);
+                }
+                
                 if let Some(room) = state.rooms.get(&room_name) {
                     room.leave(user_id);
 

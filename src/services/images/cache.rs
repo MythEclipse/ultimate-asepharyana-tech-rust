@@ -498,15 +498,33 @@ impl ImageCache {
         // Determine filename from URL
         let filename = self.extract_filename(original_url);
 
+        use futures::stream::StreamExt;
+        let mut tasks = futures::stream::FuturesUnordered::new();
+
+        for api_url in PICSER_API_ENDPOINTS {
+            let image_bytes_ref = &image_bytes;
+            let filename_ref = &filename;
+            
+            tasks.push(async move {
+                debug!("ImageCache: Attempting upload to: {}", api_url);
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    self.perform_single_upload(api_url, image_bytes_ref, filename_ref)
+                ).await {
+                    Ok(Ok(response)) => self.extract_cdn_url(response, original_url),
+                    Ok(Err(e)) => Err(e),
+                    Err(_) => Err(format!("Timeout (5s) for {}", api_url)),
+                }
+            });
+        }
+
         let mut last_error = String::from("No endpoints available");
 
-        // Try endpoints in priority order
-        for api_url in PICSER_API_ENDPOINTS {
-            debug!("ImageCache: Attempting upload to: {}", api_url);
-            match self.perform_single_upload(api_url, &image_bytes, &filename).await {
-                Ok(response) => return self.extract_cdn_url(response, original_url),
+        while let Some(result) = tasks.next().await {
+            match result {
+                Ok(cdn_url) => return Ok(cdn_url),
                 Err(e) => {
-                    warn!("ImageCache: Upload to {} failed: {}", api_url, e);
+                    warn!("ImageCache: Upload attempt failed: {}", e);
                     last_error = e;
                 }
             }

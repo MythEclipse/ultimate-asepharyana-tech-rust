@@ -37,7 +37,14 @@ impl Default for BrowserPoolConfig {
     fn default() -> Self {
         // Remote CDP takes absolute priority. When CHROME_REMOTE_WS is set we
         // skip local Chrome detection entirely — the sidecar handles the browser.
-        let remote_websocket_url = std::env::var("CHROME_REMOTE_WS").ok();
+        let mut remote_websocket_url = std::env::var("CHROME_REMOTE_WS").ok();
+        
+        // If Coolify forces legacy local mapping, allow manual environment override
+        if remote_websocket_url.is_none() || remote_websocket_url.as_deref() == Some("ws://browserless:3000") {
+            if let Ok(override_ws) = std::env::var("EXTERNAL_BROWSERLESS_WS") {
+                remote_websocket_url = Some(override_ws);
+            }
+        }
 
         // Only probe local Chrome paths when no remote URL is configured.
         let chrome_path = if remote_websocket_url.is_some() {
@@ -388,9 +395,6 @@ impl BrowserPool {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create new tab: {}", e))?;
 
-        // Set default timeout
-        // page.set_default_timeout(Duration::from_secs(30));
-
         Ok(Arc::new(page))
     }
 
@@ -435,27 +439,27 @@ pub struct PooledTab {
 impl PooledTab {
     /// Navigate to a URL.
     pub async fn goto(&self, url: &str) -> anyhow::Result<()> {
-        self.page
-            .goto(url)
+        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.goto(url))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout navigating to {}", url))?
             .map_err(|e| anyhow::anyhow!("Failed to navigate to {}: {}", url, e))?;
         Ok(())
     }
 
     /// Wait for navigation to complete.
     pub async fn wait_for_navigation(&self) -> anyhow::Result<()> {
-        self.page
-            .wait_for_navigation()
+        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.wait_for_navigation())
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout waiting for navigation"))?
             .map_err(|e| anyhow::anyhow!("Navigation timeout: {}", e))?;
         Ok(())
     }
 
     /// Get the page content (HTML).
     pub async fn content(&self) -> anyhow::Result<String> {
-        self.page
-            .content()
+        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.content())
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout getting page content"))?
             .map_err(|e| anyhow::anyhow!("Failed to get page content: {}", e))
     }
 
@@ -464,9 +468,9 @@ impl PooledTab {
         &self,
         expression: &str,
     ) -> anyhow::Result<T> {
-        self.page
-            .evaluate(expression)
+        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.evaluate(expression))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout evaluating JS"))?
             .map_err(|e| anyhow::anyhow!("Failed to evaluate JS: {}", e))?
             .into_value()
             .map_err(|e| anyhow::anyhow!("Failed to convert JS result: {}", e))
@@ -474,58 +478,57 @@ impl PooledTab {
 
     /// Wait for a selector to appear.
     pub async fn wait_for_selector(&self, selector: &str) -> anyhow::Result<()> {
-        self.page
-            .find_element(selector)
+        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout waiting for selector '{}'", selector))?
             .map_err(|e| anyhow::anyhow!("Selector '{}' not found: {}", selector, e))?;
         Ok(())
     }
 
     /// Click an element by selector.
     pub async fn click(&self, selector: &str) -> anyhow::Result<()> {
-        let element = self
-            .page
-            .find_element(selector)
+        let element = tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout locating click element '{}'", selector))?
             .map_err(|e| anyhow::anyhow!("Element '{}' not found: {}", selector, e))?;
-        element
-            .click()
+        tokio::time::timeout(std::time::Duration::from_secs(15), element.click())
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout during click '{}'", selector))?
             .map_err(|e| anyhow::anyhow!("Failed to click '{}': {}", selector, e))?;
         Ok(())
     }
 
     /// Type text into an element.
     pub async fn type_text(&self, selector: &str, text: &str) -> anyhow::Result<()> {
-        let element = self
-            .page
-            .find_element(selector)
+        let element = tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout locating element for typing '{}'", selector))?
             .map_err(|e| anyhow::anyhow!("Element '{}' not found: {}", selector, e))?;
-        element
-            .type_str(text)
+        tokio::time::timeout(std::time::Duration::from_secs(15), element.type_str(text))
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout typing into '{}'", selector))?
             .map_err(|e| anyhow::anyhow!("Failed to type into '{}': {}", selector, e))?;
         Ok(())
     }
 
     /// Take a screenshot as PNG bytes.
     pub async fn screenshot(&self) -> anyhow::Result<Vec<u8>> {
-        self.page
-            .screenshot(
-                chromiumoxide::page::ScreenshotParams::builder()
-                    .full_page(true)
-                    .build(),
-            )
+        let future = self.page.screenshot(
+            chromiumoxide::page::ScreenshotParams::builder()
+                .full_page(true)
+                .build(),
+        );
+        tokio::time::timeout(std::time::Duration::from_secs(15), future)
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout taking screenshot"))?
             .map_err(|e| anyhow::anyhow!("Failed to take screenshot: {}", e))
     }
 
     /// Get the current URL.
     pub async fn url(&self) -> anyhow::Result<String> {
-        self.page
-            .url()
+        tokio::time::timeout(std::time::Duration::from_secs(10), self.page.url())
             .await
+            .map_err(|_| anyhow::anyhow!("Timeout getting URL"))?
             .map_err(|e| anyhow::anyhow!("Failed to get URL: {}", e))
             .map(|u| u.map(|url| url.to_string()).unwrap_or_default())
     }

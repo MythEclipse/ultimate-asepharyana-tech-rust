@@ -11,6 +11,8 @@ pub type AppSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 pub fn create_schema(db: Arc<DatabaseConnection>) -> AppSchema {
     Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(db)
+        .limit_depth(7)
+        .limit_complexity(100)
         .finish()
 }
 

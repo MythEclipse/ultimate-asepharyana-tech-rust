@@ -63,12 +63,6 @@ pub enum AppError {
     NotFound(String),
 }
 
-impl From<failure::Error> for AppError {
-    fn from(err: failure::Error) -> Self {
-        AppError::Other(err.to_string())
-    }
-}
-
 impl From<&str> for AppError {
     fn from(s: &str) -> Self {
         AppError::Other(s.to_string())

@@ -31,7 +31,7 @@ pub static REDIS_POOL: Lazy<Pool> = Lazy::new(|| {
 
     Pool::builder(Manager::new(redis_url).expect("Failed to create Redis manager"))
         .max_size(100)  // Increased from 50 for high-traffic
-        .wait_timeout(Some(std::time::Duration::from_secs(5))) // Add wait timeout
+        .wait_timeout(Some(std::time::Duration::from_millis(200))) // Aggressive fail-fast timeout
         .runtime(deadpool_redis::Runtime::Tokio1)
         .build()
         .expect("Failed to create Redis connection pool")

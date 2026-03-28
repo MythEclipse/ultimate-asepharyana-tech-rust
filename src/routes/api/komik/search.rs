@@ -38,7 +38,6 @@ static PAGE_SELECTORS: Lazy<scraper::Selector> = Lazy::new(|| {
     selector(".pagination > a, .pagination > .page-numbers:not(.next):not(.prev), .hpage a")
         .unwrap()
 });
-static SLUG_REGEX: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new(r"/([^/]+)/?$").unwrap());
 
 #[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MangaItem {

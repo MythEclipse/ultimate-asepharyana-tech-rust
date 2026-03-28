@@ -92,6 +92,55 @@ impl Scheduler {
 
 // Real scheduled tasks with actual implementations
 
+// Helper for Redis SCAN processing without blocking the core event loop
+async fn scan_and_clean(
+    conn: &mut deadpool_redis::Connection,
+    pattern: &str,
+    fix_ttl: bool,
+) -> usize {
+    let mut cursor: u64 = 0;
+    let mut cleaned = 0;
+
+    loop {
+        let result: (u64, Vec<String>) = match deadpool_redis::redis::cmd("SCAN")
+            .cursor_arg(cursor)
+            .arg("MATCH")
+            .arg(pattern)
+            .arg("COUNT")
+            .arg(1000)
+            .query_async(&mut **conn)
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!("SCAN failed for {}: {}", pattern, e);
+                break;
+            }
+        };
+
+        cursor = result.0;
+        let keys = result.1;
+
+        for key in keys {
+            let ttl: i64 = match conn.ttl(&key).await {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+
+            if ttl == -2 {
+                cleaned += 1;
+            } else if ttl == -1 && fix_ttl {
+                let _: () = conn.expire(&key, 86400).await.unwrap_or(());
+            }
+        }
+
+        if cursor == 0 {
+            break;
+        }
+    }
+    cleaned
+}
+
 /// Cleanup expired sessions from Redis.
 /// Runs every hour to remove expired session tokens.
 pub struct CleanupExpiredSessions;
@@ -114,32 +163,7 @@ impl ScheduledTask for CleanupExpiredSessions {
 
         match REDIS_POOL.get().await {
             Ok(mut conn) => {
-                // Get all session keys
-                let keys: Vec<String> = match conn.keys::<_, Vec<String>>("session:*").await {
-                    Ok(k) => k,
-                    Err(e) => {
-                        tracing::error!("Failed to get session keys: {}", e);
-                        return;
-                    }
-                };
-
-                let mut cleaned = 0;
-                for key in keys {
-                    // Check TTL - if key has no TTL or TTL is -2 (expired), delete it
-                    let ttl: i64 = match conn.ttl(&key).await {
-                        Ok(t) => t,
-                        Err(_) => continue,
-                    };
-
-                    if ttl == -2 {
-                        // Key doesn't exist (already expired)
-                        cleaned += 1;
-                    } else if ttl == -1 {
-                        // Key has no expiration, set one (24 hours)
-                        let _: () = conn.expire(&key, 86400).await.unwrap_or(());
-                    }
-                }
-
+                let cleaned = scan_and_clean(&mut conn, "session:*", true).await;
                 info!(
                     "Session cleanup complete: {} expired sessions found",
                     cleaned
@@ -173,32 +197,9 @@ impl ScheduledTask for CleanupExpiredTokens {
 
         match REDIS_POOL.get().await {
             Ok(mut conn) => {
-                // Clean blacklisted JWT tokens
-                let blacklist_keys: Vec<String> = conn
-                    .keys::<_, Vec<String>>("jwt_blacklist:*")
-                    .await
-                    .unwrap_or_default();
-
                 let mut cleaned = 0;
-                for key in blacklist_keys {
-                    let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
-                    if ttl == -2 {
-                        cleaned += 1;
-                    }
-                }
-
-                // Clean verification tokens
-                let verify_keys: Vec<String> = conn
-                    .keys::<_, Vec<String>>("verify:*")
-                    .await
-                    .unwrap_or_default();
-
-                for key in verify_keys {
-                    let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
-                    if ttl == -2 {
-                        cleaned += 1;
-                    }
-                }
+                cleaned += scan_and_clean(&mut conn, "jwt_blacklist:*", false).await;
+                cleaned += scan_and_clean(&mut conn, "verify:*", false).await;
 
                 info!("Token cleanup complete: {} expired tokens found", cleaned);
             }
