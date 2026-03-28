@@ -1,0 +1,24 @@
+name: Notify Parent Repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger root monorepo build
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: MythEclipse/ultimate-asepharyana.tech
+          event-type: submodule-updated
+          client-payload: |
+            {
+              "service": "rust-api",
+              "ref": "${{ github.ref }}",
+              "sha": "${{ github.sha }}",
+              "actor": "${{ github.actor }}"
+            }
