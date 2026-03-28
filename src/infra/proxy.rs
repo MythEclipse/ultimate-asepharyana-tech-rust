@@ -37,6 +37,9 @@ impl std::fmt::Display for FetchResult {
 static IN_FLIGHT: Lazy<DashMap<String, broadcast::Sender<Result<FetchResult, String>>>> =
     Lazy::new(DashMap::new);
 
+// Global Blacklist for domains that consistently fail direct fetch (Timeouts, SSL, Cloudflare blocks)
+static FAILED_DOMAINS: Lazy<dashmap::DashSet<String>> = Lazy::new(dashmap::DashSet::new);
+
 // --- REDIS CACHE WRAPPER START ---
 fn get_fetch_cache_key(slug: &str) -> String {
     format!("fetch:proxy:{slug}")
@@ -133,8 +136,20 @@ pub async fn fetch_with_proxy(slug: &str) -> Result<FetchResult, AppError> {
     }
 }
 
-/// The actual fetch logic (Direct -> Retry)
+/// The actual fetch logic (Direct -> Retry -> Proxy)
 async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
+    // 1. Extract domain for Circuit Breaker logic
+    let domain = reqwest::Url::parse(slug)
+        .ok()
+        .and_then(|u| u.host_str().map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    // 2. Immediate proxy fallback if domain has a known history of brutal timeouts/blocks
+    if !domain.is_empty() && FAILED_DOMAINS.contains(&domain) {
+        warn!("[Circuit Breaker] Domain {} is blacklisted from direct-fetch. Routing via Leapcell proxy.", domain);
+        return fetch_from_single_proxy(slug).await;
+    }
+
     // Use shared global HTTP client
     let client = http_client().client();
     let headers = common_headers();
@@ -212,8 +227,15 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
                     res.status(),
                     slug
                 );
-                if res.status().is_server_error() {
+                
+                // Penalize domain if it throws aggressive Anti-Bot or Gateway Timeout codes
+                if res.status().is_server_error() || res.status() == reqwest::StatusCode::FORBIDDEN || res.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                    if !domain.is_empty() {
+                        warn!("[Circuit Breaker] Blacklisting domain {} due to hostile HTTP status {}", domain, res.status());
+                        FAILED_DOMAINS.insert(domain.clone());
+                    }
                     error!("{}", error_msg);
+                    return fetch_from_single_proxy(slug).await;
                 } else {
                     warn!("{}", error_msg);
                 }
@@ -223,7 +245,15 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
         Err(e) => {
             let error_msg = format!("Direct fetch failed for {}: {:?}", slug, e);
             warn!("{}", error_msg);
-            Err(AppError::Other(error_msg))
+            
+            // Hard panic mapping: If reqwest core network/TLS fails, instantly blacklist the domain
+            if !domain.is_empty() {
+                warn!("[Circuit Breaker] Blacklisting domain {} due to core network/SSL trace failure", domain);
+                FAILED_DOMAINS.insert(domain.clone());
+            }
+            
+            // Fall back seamlessly to Leapcell network proxy instead of throwing fatal transient backoff
+            fetch_from_single_proxy(slug).await
         }
     }
 }
