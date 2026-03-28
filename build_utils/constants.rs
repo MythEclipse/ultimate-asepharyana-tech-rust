@@ -69,7 +69,7 @@ pub const OPENAPI_DOC_TEMPLATE: &str = r#"#[derive(utoipa::OpenApi)]
             "bearer_auth" = []
         )),
         servers(
-            (url = "https://ws.asepharyana.tech", description = "Production Server"),
+            (url = "https://rust.asepharyana.tech", description = "Production Server"),
             (url = "http://rust-api:4091", description = "Docker Service"),
             (url = "http://localhost:4091", description = "Local Development")
         ),

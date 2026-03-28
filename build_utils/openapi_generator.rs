@@ -74,7 +74,7 @@ fn generate_root_api_mod_internal(
         
         use utoipa::OpenApi;
         #[derive(utoipa::OpenApi)]
-        #[openapi(paths(), components(schemas()), modifiers(&SecurityAddon), security(("bearer_auth" = [])), servers((url = "https://ws.asepharyana.tech", description = "Production Server"), (url = "http://localhost:4091", description = "Local Development")), tags())]
+        #[openapi(paths(), components(schemas()), modifiers(&SecurityAddon), security(("bearer_auth" = [])), servers((url = "https://rust.asepharyana.tech", description = "Production Server"), (url = "http://localhost:4091", description = "Local Development")), tags())]
         struct TempApiDoc;
         struct SecurityAddon;
         impl utoipa::Modify for SecurityAddon {
