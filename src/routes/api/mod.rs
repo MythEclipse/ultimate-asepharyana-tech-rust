@@ -319,15 +319,10 @@ use crate::routes::api::tools::uploader::ListResponse as ListResponse_2;
                   ListResponse_2
             )
         ),
-        modifiers(&SecurityAddon),
+        modifiers(&SecurityAddon, &ServerAddon),
         security((
             "bearer_auth" = []
         )),
-        servers(
-            (url = "https://ws.asepharyana.tech", description = "Production Server"),
-            (url = "http://rust-api:4091", description = "Docker Service"),
-            (url = "http://localhost:4091", description = "Local Development")
-        ),
         info(
             title = "Freefire API",
             version = "0.0.1",
@@ -356,6 +351,42 @@ use crate::routes::api::tools::uploader::ListResponse as ListResponse_2;
                     ),
                 )
             }
+        }
+    }
+
+    struct ServerAddon;
+
+    impl utoipa::Modify for ServerAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            let environment = std::env::var("ENVIRONMENT")
+                .unwrap_or_else(|_| "development".to_string());
+
+            let mut servers = vec![
+                utoipa::openapi::ServerBuilder::new()
+                    .url("https://rust.asepharyana.tech")
+                    .description(Some("Production"))
+                    .build(),
+            ];
+
+            // Only expose localhost/docker entries outside production.
+            // A single server entry means Swagger UI shows NO server dropdown — user
+            // never has to manually select anything.
+            if environment != "production" {
+                servers.push(
+                    utoipa::openapi::ServerBuilder::new()
+                        .url("http://rust-api:4091")
+                        .description(Some("Docker Service"))
+                        .build(),
+                );
+                servers.push(
+                    utoipa::openapi::ServerBuilder::new()
+                        .url("http://localhost:4091")
+                        .description(Some("Local Development"))
+                        .build(),
+                );
+            }
+
+            openapi.servers = Some(servers);
         }
     }
 
