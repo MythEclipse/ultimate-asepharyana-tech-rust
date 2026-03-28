@@ -104,6 +104,15 @@ pub async fn fetch_with_proxy(slug: &str) -> Result<FetchResult, AppError> {
             let tx_clone = tx.clone();
 
             tokio::spawn(async move {
+                // RAII Guard: Guarantee slug eviction exactly once the task finishes or panics!
+                struct DropGuard(String);
+                impl Drop for DropGuard {
+                    fn drop(&mut self) {
+                        IN_FLIGHT.remove(&self.0);
+                    }
+                }
+                let _guard = DropGuard(slug_clone.clone());
+
                 let result = perform_fetch(&slug_clone).await;
 
                 // Map AppError to String for broadcast (since AppError might not be Clone)
@@ -112,9 +121,6 @@ pub async fn fetch_with_proxy(slug: &str) -> Result<FetchResult, AppError> {
                     Ok(res) => Ok(res.clone()),
                     Err(e) => Err(e.to_string()),
                 };
-
-                // Remove from map BEFORE broadcasting to allow retries if needed
-                IN_FLIGHT.remove(&slug_clone);
 
                 // Broadcast result to all waiting subscribers
                 let _ = tx_clone.send(broadcast_result);
@@ -181,12 +187,14 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
                     let decompressed = tokio::task::spawn_blocking(move || {
                         use flate2::read::GzDecoder;
                         use std::io::Read;
-                        let mut decoder = GzDecoder::new(&bytes[..]);
+                        let decoder = GzDecoder::new(&bytes[..]);
                         let mut decompressed = Vec::new();
+                        // 10MB absolute decompression bounds to prevent GZIP Bombs (OOM vulnerability)
                         decoder
+                            .take(10_000_000)
                             .read_to_end(&mut decompressed)
                             .map(|_| decompressed)
-                            .map_err(|e| AppError::Other(format!("Decompression failed: {:?}", e)))
+                            .map_err(|e| AppError::Other(format!("Decompression failed or exceeded limits: {:?}", e)))
                     })
                     .await??;
 
