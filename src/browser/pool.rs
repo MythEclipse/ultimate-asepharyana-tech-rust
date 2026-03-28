@@ -35,16 +35,45 @@ pub struct BrowserPoolConfig {
 
 impl Default for BrowserPoolConfig {
     fn default() -> Self {
-        // Remote CDP takes absolute priority. When CHROME_REMOTE_WS is set we
-        // skip local Chrome detection entirely — the sidecar handles the browser.
-        let mut remote_websocket_url = std::env::var("CHROME_REMOTE_WS").ok();
-        
-        // If Coolify forces legacy local mapping, allow manual environment override
-        if remote_websocket_url.is_none() || remote_websocket_url.as_deref() == Some("ws://browserless:3000") {
-            if let Ok(override_ws) = std::env::var("EXTERNAL_BROWSERLESS_WS") {
-                remote_websocket_url = Some(override_ws);
+        // Priority (highest → lowest):
+        //   1. EXTERNAL_BROWSERLESS_WS  — explicit operator override, always wins
+        //   2. CHROME_REMOTE_WS         — may be injected by Coolify/Docker networking;
+        //      rejected when it resolves to the unroutable Docker alias
+        //      "ws://browserless:3000" (name-resolution will fail outside Docker overlay)
+        //   3. <None>                   — fall through to local Chrome launch
+
+        let external = std::env::var("EXTERNAL_BROWSERLESS_WS").ok();
+        let chrome_remote = std::env::var("CHROME_REMOTE_WS").ok();
+
+        let remote_websocket_url: Option<String> = if let Some(ext) = external {
+            // EXTERNAL_BROWSERLESS_WS is unconditionally the highest-priority source.
+            tracing::info!(
+                "🌐 Browser: using EXTERNAL_BROWSERLESS_WS ({})",
+                ext
+            );
+            Some(ext)
+        } else if let Some(ref cr) = chrome_remote {
+            if cr == "ws://browserless:3000" {
+                // Coolify injects this Docker-alias URL which is only reachable
+                // from within the overlay network. If EXTERNAL_BROWSERLESS_WS is
+                // not set we have no valid remote target — fall back to local Chrome.
+                tracing::warn!(
+                    "CHROME_REMOTE_WS is set to the unroutable Docker alias \
+                     \"ws://browserless:3000\" and EXTERNAL_BROWSERLESS_WS is unset. \
+                     Falling back to local Chrome launch."
+                );
+                None
+            } else {
+                tracing::info!(
+                    "🌐 Browser: using CHROME_REMOTE_WS ({})",
+                    cr
+                );
+                chrome_remote
             }
-        }
+        } else {
+            tracing::info!("🖥️  Browser: no remote CDP URL configured — will launch local Chrome");
+            None
+        };
 
         // Only probe local Chrome paths when no remote URL is configured.
         let chrome_path = if remote_websocket_url.is_some() {
