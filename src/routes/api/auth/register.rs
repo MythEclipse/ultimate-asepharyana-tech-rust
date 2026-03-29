@@ -168,7 +168,7 @@ pub async fn register(
         .clone()
         .unwrap_or_else(|| payload.email.clone());
     let verify_url = format!(
-        "https://asepharyana.cloud/verify?token={}",
+        "https://asepharyana.tech/verify?token={}",
         verification_token
     );
 

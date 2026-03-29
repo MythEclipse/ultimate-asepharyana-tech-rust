@@ -103,7 +103,7 @@ pub async fn forgot_password(
         // Generate email using email_template helper
         let name = user_model.name.as_deref().unwrap_or("User");
         let reset_url = format!(
-            "https://asepharyana.cloud/reset-password?token={}",
+            "https://asepharyana.tech/reset-password?token={}",
             reset_token
         );
         let _email = password_reset_email(name, &reset_url);

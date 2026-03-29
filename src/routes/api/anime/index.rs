@@ -231,7 +231,7 @@ mod tests {
                         <h2 class="jdlflm">One Piece</h2>
                     </div>
                     <div class="epz">Episode 1000</div>
-                    <a href="https://otakudesu.cloud/anime/one-piece-slug/"></a>
+                    <a href="https://otakudesu.best/anime/one-piece-slug/"></a>
                     <img src="https://example.com/op.jpg" />
                 </li>
             </ul>
@@ -256,7 +256,7 @@ mod tests {
                         <h2 class="jdlflm">Naruto</h2>
                     </div>
                     <div class="epz">500 Episodes</div>
-                    <a href="https://otakudesu.cloud/anime/naruto-slug/"></a>
+                    <a href="https://otakudesu.best/anime/naruto-slug/"></a>
                     <img src="https://example.com/naruto.jpg" />
                 </li>
             </ul>
