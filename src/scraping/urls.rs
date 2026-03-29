@@ -7,7 +7,7 @@ use std::env;
 
 pub const ANIMEAPI: &str = "https://anime.asepharyana.tech";
 pub const BASE_URL: &str = "http://127.0.0.1:4090";
-pub const OTAKUDESU_BASE_URL: &str = "https://otakudesu.best";
+pub const OTAKUDESU_BASE_URL: &str = "https://otakudesu.blog/";
 
 /// Get Komik URL from environment config.
 pub fn get_komik_url() -> String {
