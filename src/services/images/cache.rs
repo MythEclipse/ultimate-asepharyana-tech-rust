@@ -277,7 +277,41 @@ impl ImageCache {
                 // Upload to Picser
                 let cdn_url = self.upload_to_picser(original_url).await?;
 
-                // Save to database
+                // 6.5. Verify CDN URL Propagation (Self-Test before caching)
+                // CDNs like jsDelivr can take a few seconds to propagate after a GitHub commit.
+                // We retry 3 times with backoff to ensure we only return and cache a functional link.
+                let mut is_valid = false;
+                let mut last_verify_error = String::from("Verification not started");
+                
+                for attempt in 1..=3 {
+                    debug!("ImageCache: Verifying CDN URL {} (Attempt {})", cdn_url, attempt);
+                    match self.verify_cdn_url(&cdn_url).await {
+                        Ok(true) => {
+                            is_valid = true;
+                            info!("ImageCache: CDN URL verified successfully for {}", original_url);
+                            break;
+                        }
+                        Ok(false) => {
+                            last_verify_error = "CDN returned non-image data or 404".to_string();
+                        }
+                        Err(e) => {
+                            last_verify_error = e;
+                        }
+                    }
+                    
+                    if attempt < 3 {
+                        // Exponential-ish backoff: 500ms, 1000ms
+                        let delay = 500 * attempt;
+                        tokio::time::sleep(std::time::Duration::from_millis(delay as u64)).await;
+                    }
+                }
+
+                if !is_valid {
+                    error!("ImageCache: CDN verification failed for {} after 3 attempts: {}", cdn_url, last_verify_error);
+                    return Err(format!("CDN link was not accessible after upload: {}", last_verify_error));
+                }
+
+                // Save to database only after successful verification
                 self.save_to_db(original_url, &cdn_url).await?;
 
                 // Cache in Redis
@@ -547,6 +581,33 @@ impl ImageCache {
 
         error!("ImageCache: All upload attempts failed for {}", original_url);
         Err(format!("All upload attempts failed. Last error: {}", last_error))
+    }
+
+    /// Internally verify a CDN URL's accessibility and validity
+    pub async fn verify_cdn_url(&self, cdn_url: &str) -> Result<bool, String> {
+        let resp = self
+            .client
+            .get(cdn_url)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+
+        if !resp.status().is_success() {
+            return Ok(false);
+        }
+
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| format!("Failed to read bytes: {}", e))?;
+
+        // Structural verification (is it really an image?)
+        if image::load_from_memory(&bytes).is_ok() {
+            Ok(true)
+        } else {
+            warn!("ImageCache: CDN URL {} returned invalid/corrupt image data during verification", cdn_url);
+            Ok(false)
+        }
     }
 
     /// Extract CDN URL from Picser response
