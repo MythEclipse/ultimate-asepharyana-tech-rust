@@ -108,13 +108,27 @@ reqwest = { version = "0.12.28", features = ["json", "stream", "multipart"] }
 [dev-dependencies]
 sea-orm = { version = "1.1.19", features = ["sqlx-mysql", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid", "mock"] }
 
-# Definisi binary untuk scaffolder
+# Definisi targets secara eksplisit untuk menghindari peringatan cargo-chef (edition/plugin)
+[lib]
+name = "rustexpress"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rustexpress"
+path = "src/main.rs"
+
+[[bin]]
+name = "migrate"
+path = "src/bin/migrate.rs"
+
+[[bin]]
+name = "test_browser"
+path = "src/bin/test_browser.rs"
+
 [[bin]]
 name = "scaffold"
 path = "src/bin/scaffold.rs"
 
-
-# Unified CLI (alias for scaffold_enhanced)
 [[bin]]
 name = "rex"
 path = "src/bin/scaffold_enhanced.rs"
