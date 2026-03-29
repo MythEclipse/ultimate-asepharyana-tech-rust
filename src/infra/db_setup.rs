@@ -52,6 +52,22 @@ pub async fn init(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
                     return Err(e);
                 }
             }
+
+            // Ensure CDN URL index exists on ImageCache
+            let index_sql = "CREATE INDEX idx_image_cache_cdn_url ON ImageCache (cdn_url)";
+            match db.execute(Statement::from_string(backend, index_sql)).await {
+                Ok(_) => info!("   ✓ Index 'idx_image_cache_cdn_url' ensured"),
+                Err(e) => {
+                    let err_str = e.to_string();
+                    // Ignore "Duplicate key name" error (1061 in MySQL)
+                    if err_str.contains("1061") {
+                        info!("   ✓ Index 'idx_image_cache_cdn_url' already exists");
+                    } else {
+                        error!("   [!] Failed to create index on ImageCache: {}", e);
+                        // Don't return error here to allow app to start even if indexing fails temporarily
+                    }
+                }
+            }
             
             info!("✅ Database schema initialization complete.");
         }

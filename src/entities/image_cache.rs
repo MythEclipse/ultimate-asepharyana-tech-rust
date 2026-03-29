@@ -26,7 +26,7 @@ pub enum Column {
     Id,
     #[sea_orm(column_name = "original_url")]
     OriginalUrl,
-    #[sea_orm(column_name = "cdn_url")]
+    #[sea_orm(column_name = "cdn_url", indexed)]
     CdnUrl,
     #[sea_orm(column_name = "created_at")]
     CreatedAt,

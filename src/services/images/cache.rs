@@ -326,6 +326,21 @@ impl ImageCache {
         None
     }
 
+    /// Find an original URL for a given CDN URL (reverse lookup)
+    pub async fn find_original_from_cdn(&self, cdn_url: &str) -> Option<String> {
+        // First check Redis (if we decide to cache the reverse mapping - currently just DB)
+        // For simplicity and to avoid Redis pollution, we go straight to DB as audit is infrequent
+        if let Ok(Some(entry)) = image_cache::Entity::find()
+            .filter(image_cache::Column::CdnUrl.eq(cdn_url))
+            .one(self.db.as_ref())
+            .await
+        {
+            return Some(entry.original_url);
+        }
+
+        None
+    }
+
     /// Invalidate cache for a URL
     pub async fn invalidate(&self, original_url: &str) -> Result<(), String> {
         let cache_key = format!("{}:{}", IMAGE_CACHE_PREFIX, url_hash(original_url));

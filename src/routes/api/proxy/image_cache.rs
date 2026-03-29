@@ -261,7 +261,17 @@ pub async fn audit_image_cache(
     let cache = ImageCache::new(state.db.clone(), state.redis_pool.clone())
         .with_semaphore(state.image_processing_semaphore.clone());
 
-    let cdn_url_opt = cache.get_cdn_url(&req.url).await;
+    let mut cdn_url_opt = cache.get_cdn_url(&req.url).await;
+    let mut actual_original_url = req.url.clone();
+
+    // Smart Probe: If not found as original_url, it might be a cdn_url already
+    if cdn_url_opt.is_none() {
+        if let Some(found_original) = cache.find_original_from_cdn(&req.url).await {
+            tracing::info!("SmartAudit: URL {} recognized as CDN URL. Original source: {}", req.url, found_original);
+            actual_original_url = found_original;
+            cdn_url_opt = Some(req.url.clone());
+        }
+    }
     
     if let Some(cdn_url) = &cdn_url_opt {
         // Download and validate the full image
@@ -275,7 +285,7 @@ pub async fn audit_image_cache(
                     if image::load_from_memory(&bytes).is_ok() {
                         is_accessible_and_valid = true;
                     } else {
-                        tracing::warn!("CDN URL {} for {} returned invalid/corrupt image data.", cdn_url, req.url);
+                        tracing::warn!("CDN URL {} for {} returned invalid/corrupt image data.", cdn_url, actual_original_url);
                     }
                 }
             },
@@ -286,7 +296,7 @@ pub async fn audit_image_cache(
         if is_accessible_and_valid {
             return Json(AuditImageCacheResponse {
                 success: true,
-                original_url: req.url,
+                original_url: actual_original_url,
                 cdn_url: Some(cdn_url.clone()),
                 was_accessible: true,
                 re_uploaded: false,
@@ -295,7 +305,7 @@ pub async fn audit_image_cache(
         }
 
         // Image is either unaccessible or corrupted, meaning we need to purge the cache, delete the source from Github (if possible), and re-upload
-        tracing::info!("CDN URL {} for {} is inaccessible/corrupted, purging from github and re-uploading...", cdn_url, req.url);
+        tracing::info!("CDN URL {} for {} is inaccessible/corrupted, purging from github and re-uploading...", cdn_url, actual_original_url);
         
         // 1. Send DELETE request to Picser to purge the file from GitHub
         let picser_delete_url = "https://picser.asepharyana.tech/api/upload";
@@ -324,28 +334,28 @@ pub async fn audit_image_cache(
         }
         
         // 2. Invalidate local database/redis cache
-        let _ = cache.invalidate(&req.url).await;
+        let _ = cache.invalidate(&actual_original_url).await;
         
-        match cache.get_or_cache(&req.url).await {
+        match cache.get_or_cache(&actual_original_url).await {
             Ok(new_cdn_url) => {
                 // Publish event for real-time refresh
                 state.event_bus.publish(ImageRepaired {
-                    original_url: req.url.clone(),
+                    original_url: actual_original_url.clone(),
                     cdn_url: new_cdn_url.clone(),
                 }).await;
 
                 Json(AuditImageCacheResponse {
                     success: true,
-                    original_url: req.url,
+                    original_url: actual_original_url,
                     cdn_url: Some(new_cdn_url),
                     was_accessible: false,
                     re_uploaded: true,
-                    message: "CDN URL was inaccessible, successfully re-uploaded".to_string(),
+                    message: "CDN URL was inaccessible, successfully re-uploaded from original sources".to_string(),
                 })
             },
             Err(e) => Json(AuditImageCacheResponse {
                 success: false,
-                original_url: req.url,
+                original_url: actual_original_url,
                 cdn_url: None,
                 was_accessible: false,
                 re_uploaded: false,
@@ -354,17 +364,17 @@ pub async fn audit_image_cache(
         }
     } else {
         // Not cached yet, cache it now
-        match cache.get_or_cache(&req.url).await {
+        match cache.get_or_cache(&actual_original_url).await {
             Ok(new_cdn_url) => {
                 // Publish event for real-time refresh
                 state.event_bus.publish(ImageRepaired {
-                    original_url: req.url.clone(),
+                    original_url: actual_original_url.clone(),
                     cdn_url: new_cdn_url.clone(),
                 }).await;
 
                 Json(AuditImageCacheResponse {
                     success: true,
-                    original_url: req.url,
+                    original_url: actual_original_url,
                     cdn_url: Some(new_cdn_url),
                     was_accessible: false,
                     re_uploaded: true,
@@ -373,7 +383,7 @@ pub async fn audit_image_cache(
             },
             Err(e) => Json(AuditImageCacheResponse {
                 success: false,
-                original_url: req.url,
+                original_url: actual_original_url,
                 cdn_url: None,
                 was_accessible: false,
                 re_uploaded: false,
