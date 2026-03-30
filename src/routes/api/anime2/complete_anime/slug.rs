@@ -22,19 +22,6 @@ use crate::scraping::anime2 as parsers;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("slug" = String, Path, description = "URL-friendly identifier for the resource (typically lowercase with hyphens)", example = "1")
-    ),
-    path = "/api/anime2/complete-anime/{slug}",
-    tag = "anime2",
-    operation_id = "anime2_complete_anime_slug",
-    responses(
-        (status = 200, description = "Handles GET requests for the anime2/complete-anime/slug endpoint.", body = ApiResponse<Vec<CompleteAnimeItem>>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
     Path(slug): Path<String>,
@@ -120,5 +107,5 @@ fn parse_anime_page(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/complete-anime/{slug}", axum::routing::get(slug))
+    router.route("/api/anime2/complete_anime/slug", axum::routing::get(slug))
 }

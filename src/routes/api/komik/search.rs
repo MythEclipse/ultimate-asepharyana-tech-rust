@@ -10,7 +10,6 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 // Static selectors to avoid parsing on each request
 static ANIMPOST_SELECTOR: Lazy<scraper::Selector> =
@@ -39,7 +38,7 @@ static PAGE_SELECTORS: Lazy<scraper::Selector> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MangaItem {
     pub title: String,
     pub poster: String,
@@ -50,7 +49,7 @@ pub struct MangaItem {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -60,13 +59,13 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SearchResponse {
     pub data: Vec<MangaItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct SearchQuery {
     pub query: Option<String>,
     pub page: Option<u32>,
@@ -76,20 +75,6 @@ use axum::extract::State;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("query" = Option<String>, Query, description = "Search parameter for filtering results", example = "sample_value"),
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1)
-    ),
-    path = "/api/komik/search",
-    tag = "komik",
-    operation_id = "komik_search",
-    responses(
-        (status = 200, description = "Searches for komik based on query parameters.", body = SearchResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn search(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<SearchQuery>,

@@ -58,15 +58,6 @@ use std::sync::Arc;
 use crate::routes::AppState;
 use crate::entities::{model_low}::{{Entity as {model}, Model}};
 
-#[utoipa::path(
-    get,
-    path = "/{resource}",
-    tag = "{resource}",
-    responses(
-        (status = 200, description = "List all {resource}", body = [Model]),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn list(
     Extension(db): Extension<DatabaseConnection>,
 ) -> impl IntoResponse {{
@@ -100,19 +91,6 @@ use std::sync::Arc;
 use crate::routes::AppState;
 use crate::entities::{model_low}::{{Entity as {model}, Model}};
 
-#[utoipa::path(
-    get,
-    path = "/{resource}/{{id}}",
-    params(
-        ("id" = i32, Path, description = "{singular} ID")
-    ),
-    tag = "{resource}",
-    responses(
-        (status = 200, description = "Get {singular} details", body = Model),
-        (status = 404, description = "{singular} not found", body = String),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn show(
     Path(id): Path<i32>,
     Extension(db): Extension<DatabaseConnection>,
@@ -146,27 +124,16 @@ fn generate_create_handler(resource: &str, model: &str) -> String {
 use axum::{{Extension, Json, response::IntoResponse, Router}};
 use sea_orm::{{ActiveModelTrait, DatabaseConnection, Set}};
 use serde::{{Deserialize, Serialize}};
-use utoipa::ToSchema;
 use std::sync::Arc;
 use crate::routes::AppState;
 use crate::entities::{model_low}::{{ActiveModel, Model}};
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize)]
 pub struct Create{model}Dto {{
     pub name: String,
     // Add your fields
 }}
 
-#[utoipa::path(
-    post,
-    path = "/{resource}",
-    tag = "{resource}",
-    request_body = Create{model}Dto,
-    responses(
-        (status = 201, description = "{singular} created successfully", body = Model),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn create(
     Extension(db): Extension<DatabaseConnection>,
     Json(data): Json<Create{model}Dto>,
@@ -204,31 +171,16 @@ fn generate_update_handler(resource: &str, model: &str) -> String {
 use axum::{{Extension, Json, extract::Path, response::IntoResponse, Router}};
 use sea_orm::{{ActiveModelTrait, DatabaseConnection, EntityTrait, Set}};
 use serde::{{Deserialize, Serialize}};
-use utoipa::ToSchema;
 use std::sync::Arc;
 use crate::routes::AppState;
 use crate::entities::{model_low}::{{ActiveModel, Entity as {model}, Model}};
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize)]
 pub struct Update{model}Dto {{
     pub name: Option<String>,
     // Add your fields
 }}
 
-#[utoipa::path(
-    put,
-    path = "/{resource}/{{id}}",
-    params(
-        ("id" = i32, Path, description = "{singular} ID")
-    ),
-    tag = "{resource}",
-    request_body = Update{model}Dto,
-    responses(
-        (status = 200, description = "{singular} updated successfully", body = Model),
-        (status = 404, description = "{singular} not found", body = String),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn update(
     Path(id): Path<i32>,
     Extension(db): Extension<DatabaseConnection>,
@@ -279,19 +231,6 @@ use std::sync::Arc;
 use crate::routes::AppState;
 use crate::entities::{model_low}::{{Entity as {model}}};
 
-#[utoipa::path(
-    delete,
-    path = "/{resource}/{{id}}",
-    params(
-        ("id" = i32, Path, description = "{singular} ID")
-    ),
-    tag = "{resource}",
-    responses(
-        (status = 204, description = "{singular} deleted successfully"),
-        (status = 404, description = "{singular} not found", body = String),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn destroy(
     Path(id): Path<i32>,
     Extension(db): Extension<DatabaseConnection>,
@@ -333,14 +272,6 @@ use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
 
-#[utoipa::path(
-    get,
-    path = "/{resource}",
-    tag = "{resource}",
-    responses(
-        (status = 200, description = "{resource} endpoint", body = String)
-    )
-)]
 pub async fn index() -> &'static str {{
     "{resource} endpoint"
 }}

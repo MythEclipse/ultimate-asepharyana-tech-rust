@@ -3,7 +3,6 @@ use crate::build_utils::path_utils::{
     compute_module_path_prefix, is_dynamic_route_content, sanitize_module_name,
 };
 use anyhow::{Context, Result};
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,7 +11,6 @@ fn process_directory_entries(
     root_api_path: &Path,
     module_path_prefix: &str,
     all_handlers: &mut Vec<HandlerRouteInfo>,
-    all_schemas: &mut HashSet<String>,
     modules: &mut Vec<String>,
     pub_mods: &mut Vec<String>,
     route_registrations: &mut Vec<String>,
@@ -42,7 +40,6 @@ fn process_directory_entries(
                 &path,
                 root_api_path,
                 all_handlers,
-                all_schemas,
                 modules,
             )?;
 
@@ -92,7 +89,7 @@ fn process_directory_entries(
             }
 
             let handler_infos =
-                update_handler_file(&path, all_schemas, module_path_prefix, root_api_path)
+                update_handler_file(&path, module_path_prefix, root_api_path)
                     .with_context(|| format!("Failed to update handler file: {:?}", path))?;
             all_handlers.extend(handler_infos);
 
@@ -165,7 +162,6 @@ pub fn generate_mod_for_directory(
     current_dir: &Path,
     root_api_path: &Path,
     all_handlers: &mut Vec<HandlerRouteInfo>,
-    all_schemas: &mut HashSet<String>,
     modules: &mut Vec<String>,
 ) -> Result<bool> {
     let mut pub_mods = Vec::new();
@@ -178,7 +174,6 @@ pub fn generate_mod_for_directory(
         root_api_path,
         &module_path_prefix,
         all_handlers,
-        all_schemas,
         modules,
         &mut pub_mods,
         &mut route_registrations,

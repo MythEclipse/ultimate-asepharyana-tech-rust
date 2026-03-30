@@ -10,18 +10,15 @@
 /// The build process runs in two phases:
 /// 1. Dry run: Validates everything without modifying files
 /// 2. Actual build: Writes the generated code and specifications
-use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use tempfile::NamedTempFile;
-use utoipa::openapi::OpenApi;
 
 mod build_utils;
-use build_utils::{auto_mod_generator, mod_generator, openapi_generator, BuildOperation};
+use build_utils::{auto_mod_generator, mod_generator, BuildOperation};
 
 /// Configuration for the build process
 #[derive(Debug)]
@@ -81,30 +78,18 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Performs a dry run to check for potential errors before actual file modifications
+/// Performs a dry run
 fn perform_dry_run(config: &BuildConfig) -> Result<()> {
     log::debug!("🔍 Performing dry run validation");
 
     let api_routes_path = setup_build_environment(config)?;
-    let (api_handlers, openapi_schemas, modules) = collect_api_data(&api_routes_path)?;
+    let (api_handlers, modules) = collect_api_data(&api_routes_path)?;
 
     log::info!(
-        "📊 Found {} handlers, {} schemas, {} modules",
+        "📊 Found {} handlers, {} modules",
         api_handlers.len(),
-        openapi_schemas.len(),
         modules.len()
     );
-
-    // Test OpenAPI generation without writing files
-    let openapi_doc = openapi_generator::generate_root_api_mod(
-        &api_routes_path,
-        &modules,
-        &api_handlers,
-        &openapi_schemas,
-    )?;
-
-    // Test OpenAPI validation
-    validate_openapi_spec(&openapi_doc)?;
 
     log::info!("✓ Dry run validation passed");
     Ok(())
@@ -117,10 +102,9 @@ fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result
     let api_routes_path = setup_build_environment(config)?;
 
     // Use auto-routing by default (new system)
-    // Can be disabled with DISABLE_AUTO_ROUTING=1 for legacy support
     let use_legacy = env::var("DISABLE_AUTO_ROUTING").is_ok();
 
-    let (api_handlers, openapi_schemas, modules) = if use_legacy {
+    let (api_handlers, modules) = if use_legacy {
         println!("cargo:warning=⚠️  Using legacy routing system (DISABLE_AUTO_ROUTING=1)");
         collect_api_data(&api_routes_path)?
     } else {
@@ -128,32 +112,18 @@ fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result
         collect_api_data_auto(&api_routes_path)?
     };
 
-    // Generate OpenAPI
-    let openapi_doc = openapi_generator::generate_root_api_mod(
-        &api_routes_path,
-        &modules,
-        &api_handlers,
-        &openapi_schemas,
-    )?;
-
-    validate_openapi_spec(&openapi_doc)?;
-
-    write_openapi_spec(&openapi_doc)?;
-
     // Track successful build
     log::info!(
-        "📝 Generated API: {} handlers, {} schemas, {} modules",
+        "📝 Generated API: {} handlers, {} modules",
         api_handlers.len(),
-        openapi_schemas.len(),
         modules.len()
     );
 
     // Store stats in operation for summary
     let routing_mode = if use_legacy { "legacy" } else { "auto" };
     operation.add_warning(format!(
-        "API generated with {} handlers, {} schemas, {} modules ({})",
+        "API generated with {} handlers, {} modules ({})",
         api_handlers.len(),
-        openapi_schemas.len(),
         modules.len(),
         routing_mode
     ));
@@ -209,45 +179,37 @@ fn create_api_routes_directory(config: &BuildConfig) -> Result<()> {
     Ok(())
 }
 
-fn collect_api_data(api_routes_path: &Path) -> Result<(ApiHandlers, HashSet<String>, Vec<String>)> {
+fn collect_api_data(api_routes_path: &Path) -> Result<(ApiHandlers, Vec<String>)> {
     log::debug!("Collecting API data");
 
     let mut api_handlers = Vec::new();
-    let mut openapi_schemas = HashSet::new();
     let mut modules = Vec::new();
-
-    openapi_schemas.reserve(100);
 
     mod_generator::generate_mod_for_directory(
         api_routes_path,
         api_routes_path,
         &mut api_handlers,
-        &mut openapi_schemas,
         &mut modules,
     )?;
 
     let modules = modules.into_iter().unique().sorted().collect();
 
-    Ok((api_handlers, openapi_schemas, modules))
+    Ok((api_handlers, modules))
 }
 
 /// Collect API data using auto-routing system
 fn collect_api_data_auto(
     api_routes_path: &Path,
-) -> Result<(ApiHandlers, HashSet<String>, Vec<String>)> {
+) -> Result<(ApiHandlers, Vec<String>)> {
     log::debug!("📡 Collecting API data with auto-routing");
 
     let mut api_handlers = Vec::new();
-    let mut openapi_schemas = HashSet::new();
     let mut modules = Vec::new();
-
-    openapi_schemas.reserve(100);
 
     // Use auto mod generator instead of manual traversal
     auto_mod_generator::generate_mods_auto(
         api_routes_path,
         &mut api_handlers,
-        &mut openapi_schemas,
         &mut modules,
     )?;
 
@@ -255,44 +217,5 @@ fn collect_api_data_auto(
 
     log::info!("✅ Auto-routing collected {} routes", api_handlers.len());
 
-    Ok((api_handlers, openapi_schemas, modules))
-}
-
-fn validate_openapi_spec(openapi: &OpenApi) -> Result<()> {
-    log::debug!("🔍 Validating OpenAPI specification");
-
-    let json = serde_json::to_string(openapi)
-        .context("Failed to serialize OpenAPI spec for validation")?;
-
-    let _: openapiv3::OpenAPI =
-        serde_json::from_str(&json)
-            .context("OpenAPI specification validation failed. Check your response schemas and endpoint definitions.")?;
-
-    log::info!("✓ OpenAPI specification validation passed");
-    Ok(())
-}
-
-fn write_openapi_spec(openapi_doc: &OpenApi) -> Result<()> {
-    log::debug!("💾 Writing OpenAPI specification to file");
-
-    let out_dir =
-        PathBuf::from(env::var("OUT_DIR").context("OUT_DIR environment variable not set")?);
-    let openapi_spec_path = out_dir.join("openapi_spec.json");
-
-    let mut temp_file =
-        NamedTempFile::new_in(&out_dir).context("Failed to create temporary OpenAPI spec file")?;
-
-    serde_json::to_writer_pretty(&mut temp_file, openapi_doc)
-        .context("Failed to serialize OpenAPI specification")?;
-
-    temp_file.persist(&openapi_spec_path).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to save OpenAPI spec to {}: {:?}",
-            openapi_spec_path.display(),
-            e
-        )
-    })?;
-
-    log::info!("✓ OpenAPI spec written to: {}", openapi_spec_path.display());
-    Ok(())
+    Ok((api_handlers, modules))
 }

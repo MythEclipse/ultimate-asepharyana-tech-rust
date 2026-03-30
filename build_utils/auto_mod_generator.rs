@@ -5,7 +5,7 @@
 use crate::build_utils::handler_updater::{update_handler_file, HandlerRouteInfo};
 use crate::build_utils::route_scanner::scan_routes;
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,13 +13,12 @@ use std::path::{Path, PathBuf};
 pub fn generate_mods_auto(
     api_root: &Path,
     all_handlers: &mut Vec<HandlerRouteInfo>,
-    all_schemas: &mut HashSet<String>,
     modules: &mut Vec<String>,
 ) -> Result<()> {
     // Scan all routes
     let routes = scan_routes(api_root)?;
 
-    println!("cargo:warning=📁 Discovered {} routes", routes.len());
+    println!("cargo:warning= Discovered {} routes", routes.len());
 
     // Group routes by directory
     let mut routes_by_dir: HashMap<PathBuf, Vec<_>> = HashMap::new();
@@ -45,7 +44,6 @@ pub fn generate_mods_auto(
             api_root,
             dir_routes,
             all_handlers,
-            all_schemas,
             modules,
         )?;
     }
@@ -59,7 +57,6 @@ fn generate_mod_for_directory_auto(
     api_root: &Path,
     routes: &[crate::build_utils::types::RouteFileInfo],
     all_handlers: &mut Vec<HandlerRouteInfo>,
-    all_schemas: &mut HashSet<String>,
     modules: &mut Vec<String>,
 ) -> Result<()> {
     let module_path_prefix = compute_module_path_prefix(current_dir, api_root)?;
@@ -67,7 +64,7 @@ fn generate_mod_for_directory_auto(
     // Update handler files
     for route in routes {
         let handler_infos =
-            update_handler_file(&route.file_path, all_schemas, &module_path_prefix, api_root)?;
+            update_handler_file(&route.file_path, &module_path_prefix, api_root)?;
         all_handlers.extend(handler_infos);
     }
 

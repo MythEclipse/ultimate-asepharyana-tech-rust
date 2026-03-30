@@ -11,10 +11,6 @@ pub enum AppError {
     ReqwestError(#[from] reqwest::Error),
     #[error("JSON serialization/deserialization error: {0}")]
     SerdeJsonError(#[from] serde_json::Error),
-    #[error("URL parsing error: {0}")]
-    UrlParseError(#[from] url::ParseError),
-    #[error("JWT error: {0}")]
-    JwtError(#[from] jsonwebtoken::errors::Error),
     #[error("Scraper error: {0}")]
     ScraperError(String),
     #[error("Fantoccini error: {0}")]
@@ -29,36 +25,10 @@ pub enum AppError {
     Other(String),
     #[error("HTTP error: {0}")]
     HttpError(#[from] http::Error),
-
-    // Authentication Errors
-    #[error("Invalid credentials")]
-    InvalidCredentials,
-    #[error("Email already exists")]
-    EmailAlreadyExists,
-    #[error("Username already exists")]
-    UsernameAlreadyExists,
-    #[error("User not found")]
-    UserNotFound,
-    #[error("Invalid token")]
-    InvalidToken,
-    #[error("Token expired")]
-    TokenExpired,
-    #[error("Email not verified")]
-    EmailNotVerified,
-    #[error("Account is inactive")]
-    AccountInactive,
-    #[error("Password too weak: {0}")]
-    WeakPassword(String),
-    #[error("Invalid email format")]
-    InvalidEmail,
+    #[error("URL parsing error: {0}")]
+    UrlParseError(#[from] url::ParseError),
     #[error("Database error: {0}")]
     DatabaseError(String),
-    #[error("Bcrypt error: {0}")]
-    BcryptError(String),
-    #[error("Unauthorized")]
-    Unauthorized,
-    #[error("Forbidden")]
-    Forbidden,
     #[error("Not Found: {0}")]
     NotFound(String),
 }
@@ -99,27 +69,10 @@ impl From<tokio::task::JoinError> for AppError {
     }
 }
 
-impl From<bcrypt::BcryptError> for AppError {
-    fn from(err: bcrypt::BcryptError) -> Self {
-        AppError::BcryptError(err.to_string())
-    }
-}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         let (status, error_message) = match self {
-            AppError::InvalidCredentials => (http::StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::EmailAlreadyExists => (http::StatusCode::CONFLICT, self.to_string()),
-            AppError::UsernameAlreadyExists => (http::StatusCode::CONFLICT, self.to_string()),
-            AppError::UserNotFound => (http::StatusCode::NOT_FOUND, self.to_string()),
-            AppError::InvalidToken => (http::StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::TokenExpired => (http::StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::EmailNotVerified => (http::StatusCode::FORBIDDEN, self.to_string()),
-            AppError::AccountInactive => (http::StatusCode::FORBIDDEN, self.to_string()),
-            AppError::WeakPassword(_) => (http::StatusCode::BAD_REQUEST, self.to_string()),
-            AppError::InvalidEmail => (http::StatusCode::BAD_REQUEST, self.to_string()),
-            AppError::Unauthorized => (http::StatusCode::UNAUTHORIZED, self.to_string()),
-            AppError::Forbidden => (http::StatusCode::FORBIDDEN, self.to_string()),
             AppError::NotFound(_) => (http::StatusCode::NOT_FOUND, self.to_string()),
             AppError::DatabaseError(_) => {
                 (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string())

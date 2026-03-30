@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 use tokio::sync::{mpsc, Mutex};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 type CompressionTask =
@@ -54,13 +53,13 @@ static QUEUE_SENDER: Lazy<mpsc::Sender<CompressionTask>> = Lazy::new(|| {
     sender
 });
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompressData {
     /// CDN link to compressed file
     pub link: Option<String>,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct CompressQuery {
     pub url: String,
     pub size: String,
@@ -412,20 +411,6 @@ async fn compress_video(
     Err("Video compression requires ffmpeg feature".into())
 }
 
-#[utoipa::path(
-    get,
-    params(
-        ("url" = String, Query, description = "Parameter for resource identification", example = "sample_value"),
-        ("size" = String, Query, description = "Parameter for resource identification", example = "sample_value")
-    ),
-    path = "/api/compress",
-    tag = "compress",
-    operation_id = "compress",
-    responses(
-        (status = 200, description = "Compress images and videos from URL", body = ApiResponse<CompressData>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn compress(Query(params): Query<CompressQuery>) -> ApiResult<CompressData> {
     tracing::info!(
         "Received compress request for URL: {} with size: {}",

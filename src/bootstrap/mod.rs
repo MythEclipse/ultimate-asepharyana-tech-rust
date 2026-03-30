@@ -7,12 +7,9 @@ use sea_orm::{Database, DatabaseConnection};
 use tower_http::compression::{CompressionLayer, CompressionLevel};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 use crate::core::config::CONFIG;
 use crate::infra::redis::REDIS_POOL;
-use crate::routes::api::{create_api_routes, ApiDoc};
 use crate::routes::AppState;
 
 pub struct Application {
@@ -74,50 +71,31 @@ impl Application {
         if let Err(e) = crate::infra::db_setup::init(&db).await {
             tracing::error!("Failed to init DB schema: {}", e);
         }
-        if let Err(e) = crate::seeder::seed::seed_chat_data_if_empty(&db).await {
-            tracing::warn!("Failed to seed chat data: {}", e);
+        // Schema & Seeding
+        if let Err(e) = crate::infra::db_setup::init(&db).await {
+            tracing::error!("Failed to init DB schema: {}", e);
         }
 
         // App State components
-        let (chat_tx, _) = tokio::sync::broadcast::channel(1000);
         let db_arc = Arc::new(db);
-        let image_processing_semaphore = Arc::new(tokio::sync::Semaphore::new(CONFIG.image_processing_concurrency));
-        let room_manager = Arc::new(crate::ws::room::RoomManager::new());
+        let image_processing_semaphore =
+            Arc::new(tokio::sync::Semaphore::new(CONFIG.image_processing_concurrency));
         let event_bus = Arc::new(crate::events::bus::EventBus::new());
 
         let app_state = Arc::new(AppState {
-            jwt_secret: CONFIG.jwt_secret.clone(),
             redis_pool: REDIS_POOL.clone(),
             db: db_arc.clone(),
 
-            chat_tx: chat_tx.clone(),
             image_processing_semaphore,
-            room_manager: room_manager.clone(),
             event_bus: event_bus.clone(),
         });
 
         // Scheduler
-        Self::init_scheduler(db_arc.clone(), room_manager).await?;
-
-        // Forward internal events to WebSocket
-        let event_bus_clone = event_bus.clone();
-        let chat_tx_clone = chat_tx.clone();
-        tokio::spawn(async move {
-            let mut rx = event_bus_clone.subscribe::<crate::events::bus::ImageRepaired>().await;
-            while let Ok(event) = rx.recv().await {
-                let msg = crate::routes::ws::models::WsMessage::ImageRepaired {
-                    original_url: event.original_url,
-                    cdn_url: event.cdn_url,
-                };
-                let _ = chat_tx_clone.send(msg);
-            }
-        });
+        Self::init_scheduler(db_arc.clone()).await?;
 
         // Router
-        let app = Router::new()
-            .merge(create_api_routes().with_state(app_state.clone()))
-            .merge(crate::routes::ws::register_routes(Router::new()).with_state(app_state))
-            .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        let app = crate::routes::api::register_routes(Router::new())
+            .with_state(app_state.clone())
             .layer(CompressionLayer::new().quality(CompressionLevel::Fastest))
             .layer(CorsLayer::permissive());
 
@@ -127,20 +105,23 @@ impl Application {
         let listener = TcpListener::bind(&addr).await?;
         tracing::info!("Server listening on {}", listener.local_addr()?);
 
-        Ok(Self { port, router: app, listener })
+        Ok(Self {
+            port,
+            router: app,
+            listener,
+        })
     }
 
-    async fn init_scheduler(
-        db: Arc<DatabaseConnection>,
-        room_manager: Arc<crate::ws::room::RoomManager>,
-    ) -> anyhow::Result<()> {
-        let scheduler = crate::scheduler::Scheduler::new().await.expect("Failed to create scheduler");
-        
-        let cache_cleanup = crate::scheduler::CleanupOldCache::new(db);
-        scheduler.add(cache_cleanup).await.expect("Failed to add cache cleanup");
+    async fn init_scheduler(db: Arc<DatabaseConnection>) -> anyhow::Result<()> {
+        let scheduler = crate::scheduler::Scheduler::new()
+            .await
+            .expect("Failed to create scheduler");
 
-        let room_cleanup = crate::scheduler::CleanupEmptyRooms::new(room_manager);
-        scheduler.add(room_cleanup).await.expect("Failed to add room cleanup");
+        let cache_cleanup = crate::scheduler::CleanupOldCache::new(db);
+        scheduler
+            .add(cache_cleanup)
+            .await
+            .expect("Failed to add cache cleanup");
 
         scheduler.start().await.expect("Failed to start scheduler");
         tracing::info!("✓ Scheduler started");

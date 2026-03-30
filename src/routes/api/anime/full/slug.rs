@@ -12,26 +12,25 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnimeInfo {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EpisodeInfo {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadLink {
     pub server: String,
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnimeFullData {
     pub episode: String,
     pub episode_number: String,
@@ -45,7 +44,7 @@ pub struct AnimeFullData {
     pub image_url: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FullResponse {
     pub status: String,
     pub data: AnimeFullData,
@@ -53,19 +52,6 @@ pub struct FullResponse {
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("slug" = String, Path, description = "URL-friendly identifier for the resource (typically lowercase with hyphens)", example = "naruto-shippuden-episode-1")
-    ),
-    path = "/api/anime/full/{slug}",
-    tag = "anime",
-    operation_id = "anime_full_slug",
-    responses(
-        (status = 200, description = "Handles GET requests for the anime/full/{slug} endpoint.", body = FullResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
     Path(slug): Path<String>,
@@ -206,5 +192,5 @@ fn parse_anime_full_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime/full/{slug}", axum::routing::get(slug))
+    router.route("/api/anime/full/slug", axum::routing::get(slug))
 }

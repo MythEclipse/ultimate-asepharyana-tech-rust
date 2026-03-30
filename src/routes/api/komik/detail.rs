@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
-use utoipa::ToSchema;
 
 // Static selectors to avoid parsing on each request
 static TD_LAST_SELECTOR: Lazy<scraper::Selector> = Lazy::new(|| selector("td:last-child").unwrap());
@@ -47,14 +46,14 @@ static CHAPTER_TITLE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)(?:chapter|ch\.?)\s*([\d\.]+)").unwrap());
 static CHAPTER_NUMBER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\d\.]+)").unwrap());
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Chapter {
     pub chapter: String,
     pub date: String,
     pub chapter_id: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DetailData {
     pub title: String,
     pub poster: String,
@@ -69,13 +68,13 @@ pub struct DetailData {
     pub chapters: Vec<Chapter>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DetailResponse {
     pub status: bool,
     pub data: DetailData,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct KomikDetailRequest {
     pub komik_id: String,
     pub chapter_id: Option<String>,
@@ -89,7 +88,7 @@ pub enum KomikDetailEvent {
     EndOfStream,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct DetailQuery {
     /// The unique identifier for the komik (typically the slug or URL path)
     pub komik_id: Option<String>,
@@ -122,19 +121,6 @@ fn find_table_row_with_text<'a>(
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("komik_id" = Option<String>, Query, description = "Comic/manga identifier", example = "sample_value")
-    ),
-    path = "/api/komik/detail",
-    tag = "komik",
-    operation_id = "komik_detail",
-    responses(
-        (status = 200, description = "Retrieves details for a specific komik by ID.", body = DetailData),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn detail(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<DetailQuery>,
@@ -481,15 +467,6 @@ fn parse_komik_detail_document(
     })
 }
 
-#[utoipa::path(
-    get,
-    path = "/api/komik/detail/ws",
-    tag = "komik",
-    operation_id = "komik_detail_ws",
-    responses(
-        (status = 101, description = "WebSocket upgrade")
-    )
-)]
 pub async fn ws_handler(ws: WebSocketUpgrade, State(app_state): State<Arc<AppState>>) -> Response {
     ws.on_upgrade(|socket| handle_socket(socket, app_state))
 }

@@ -20,23 +20,22 @@ use axum::{
 use backoff::future::retry;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EpisodeList {
     pub episode: String,
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Recommendation {
     pub title: String,
     pub slug: String,
@@ -47,7 +46,7 @@ pub struct Recommendation {
     pub r#type: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnimeDetailData {
     pub title: String,
     pub alternative_title: String,
@@ -69,7 +68,7 @@ pub struct AnimeDetailData {
     pub recommendations: Vec<Recommendation>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DetailResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
@@ -78,19 +77,6 @@ pub struct DetailResponse {
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("slug" = String, Path, description = "URL-friendly identifier for the resource (typically lowercase with hyphens)", example = "naruto-shippuden-episode-1")
-    ),
-    path = "/api/anime/detail/{slug}",
-    tag = "anime",
-    operation_id = "anime_detail_slug",
-    responses(
-        (status = 200, description = "Handles GET requests for the anime/detail/{slug} endpoint.", body = DetailResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
     Path(slug): Path<String>,
@@ -292,5 +278,5 @@ fn parse_anime_detail_document(html: &str) -> Result<AnimeDetailData, AppError> 
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime/detail/{slug}", axum::routing::get(slug))
+    router.route("/api/anime/detail/slug", axum::routing::get(slug))
 }

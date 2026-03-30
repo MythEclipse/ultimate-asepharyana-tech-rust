@@ -5,12 +5,10 @@
 pub mod config;
 pub mod types;
 pub mod error;
-pub mod jwt;
 pub mod ratelimit;
 
 pub use config::CONFIG;
 
-pub use jwt::{encode_jwt, decode_jwt, Claims};
 pub use ratelimit::rate_limit_middleware;
 
 // Re-export AppError from utils for backward compatibility

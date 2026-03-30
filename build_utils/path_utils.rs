@@ -1,38 +1,4 @@
 use crate::build_utils::constants::DYNAMIC_REGEX;
-use regex::Regex;
-
-pub fn extract_path_params(axum_path: &str) -> Vec<(String, String)> {
-    let re = Regex::new(r"\{([^}]+)\}").unwrap();
-    re.captures_iter(axum_path)
-        .map(|cap| {
-            let param = &cap[1];
-            if param.starts_with("...") {
-                (
-                    param.strip_prefix("...").unwrap().to_string(),
-                    "Vec<String>".to_string(),
-                )
-            } else {
-                (param.to_string(), "String".to_string())
-            }
-        })
-        .collect()
-}
-
-pub fn parse_path_params_from_signature(
-    content: &str,
-) -> Result<Vec<(String, String)>, anyhow::Error> {
-    // Look for Path parameters directly
-    let param_regex = Regex::new(r"Path\((\w+)\):\s*Path<([^>]+)>")
-        .map_err(|e| anyhow::anyhow!("Invalid path regex pattern: {}", e))?;
-    Ok(param_regex
-        .captures_iter(content)
-        .map(|cap| {
-            let name = cap[1].to_string();
-            let typ = cap[2].to_string();
-            (name, typ)
-        })
-        .collect())
-}
 
 pub fn generate_default_description(path_str: &str, method: &str) -> String {
     let path_segments: Vec<&str> = path_str.trim_matches('/').split('/').collect();

@@ -29,9 +29,8 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap(
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PopularKomikItem {
     pub rank: u32,
     pub title: String,
@@ -43,7 +42,7 @@ pub struct PopularKomikItem {
     pub komik_url: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -53,7 +52,7 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PopularKomikResponse {
     pub status: String,
     pub period: String,
@@ -61,7 +60,7 @@ pub struct PopularKomikResponse {
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct PopularQuery {
     pub page: Option<u32>,
     pub period: Option<String>,
@@ -69,20 +68,6 @@ pub struct PopularQuery {
 
 const CACHE_TTL: u64 = 600;
 
-#[utoipa::path(
-    get,
-    params(
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1),
-        ("period" = Option<String>, Query, description = "Parameter for resource identification", example = "sample_value")
-    ),
-    path = "/api/komik/popular",
-    tag = "komik",
-    operation_id = "komik_popular",
-    responses(
-        (status = 200, description = "Get popular komik rankings", body = PopularKomikResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn popular(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<PopularQuery>,

@@ -10,16 +10,15 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenresResponse {
     pub status: String,
     pub data: Vec<Genre>,
@@ -29,16 +28,6 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"genre-(.+)$").unwrap(
 
 const CACHE_TTL: u64 = 3600; // 1 hour
 
-#[utoipa::path(
-    get,
-    path = "/api/anime2/genres",
-    tag = "anime2",
-    operation_id = "anime2_genres",
-    responses(
-        (status = 200, description = "Get list of all available anime2 genres", body = GenresResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
@@ -100,5 +89,5 @@ fn parse_genres(html: &str) -> Result<Vec<Genre>, Box<dyn std::error::Error + Se
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/genres", axum::routing::get(genres))
+    router.route("/api/anime2/genre_list", axum::routing::get(genres))
 }

@@ -12,10 +12,9 @@ use axum::{extract::Query, Json, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info};
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChapterData {
     pub title: String,
     pub next_chapter_id: String,
@@ -24,13 +23,13 @@ pub struct ChapterData {
     pub images: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChapterResponse {
     pub message: String,
     pub data: ChapterData,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct ChapterQuery {
     /// URL-friendly identifier for the chapter (typically the chapter slug or URL path)
     pub chapter_url: Option<String>,
@@ -38,19 +37,6 @@ pub struct ChapterQuery {
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("chapter_url" = Option<String>, Query, description = "Chapter-specific identifier", example = "sample_value")
-    ),
-    path = "/api/komik/chapter",
-    tag = "komik",
-    operation_id = "komik_chapter",
-    responses(
-        (status = 200, description = "Retrieves chapter data for a specific komik chapter.", body = ChapterResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn chapter(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<ChapterQuery>,

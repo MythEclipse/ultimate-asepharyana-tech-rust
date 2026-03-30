@@ -6,32 +6,18 @@ use axum::{
 use http::StatusCode;
 use serde::Deserialize;
 use std::sync::Arc;
-use utoipa::ToSchema;
 
 use crate::infra::proxy::fetch_with_proxy;
 use crate::routes::AppState;
 use crate::core::error::AppError;
 
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct ProxyParams {
     url: String,
 }
 
 /// Handles GET requests for the proxy endpoint.
-#[utoipa::path(
-    get,
-    params(
-        ("url" = String, Query, description = "Parameter for resource identification", example = "sample_value")
-    ),
-    path = "/api/proxy/croxy",
-    tag = "proxy",
-    operation_id = "fetch_with_proxy_only",
-    responses(
-        (status = 200, description = "Handles GET requests for the proxy endpoint.", body = Vec<u8>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn fetch_with_proxy_only(
     _: State<Arc<AppState>>,
     Query(params): Query<ProxyParams>,

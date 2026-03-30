@@ -12,10 +12,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info};
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManhuaItem {
     pub title: String,
     pub poster: String,
@@ -26,7 +25,7 @@ pub struct ManhuaItem {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -36,13 +35,13 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManhuaResponse {
     pub data: Vec<ManhuaItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct QueryParams {
     /// Page number for pagination (defaults to 1)
     pub page: Option<u32>,
@@ -50,19 +49,6 @@ pub struct QueryParams {
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1)
-    ),
-    path = "/api/komik/manhua",
-    tag = "komik",
-    operation_id = "komik_manhua_slug",
-    responses(
-        (status = 200, description = "Handles GET requests for the komik/manhua endpoint.", body = ManhuaResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn list(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<QueryParams>,
@@ -259,5 +245,5 @@ fn parse_manhua_list_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/komik/manhua", axum::routing::get(list))
+    router.route("/api/komik/manhua/slug", axum::routing::get(list))
 }

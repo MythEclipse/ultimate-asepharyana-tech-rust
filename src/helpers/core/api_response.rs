@@ -29,10 +29,9 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 /// Standard API response wrapper.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     /// Whether the request was successful
     pub success: bool,
@@ -47,12 +46,11 @@ pub struct ApiResponse<T> {
     pub pagination: Option<PaginationMeta>,
     /// Additional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<Object>)]
     pub meta: Option<serde_json::Value>,
 }
 
 /// Error details for failed responses.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorDetails {
     /// Error code (machine-readable)
     pub code: String,
@@ -64,7 +62,7 @@ pub struct ErrorDetails {
 }
 
 /// Field-level validation error.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FieldError {
     /// Field name
     pub field: String,
@@ -73,7 +71,7 @@ pub struct FieldError {
 }
 
 /// Pagination metadata.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginationMeta {
     /// Current page number
     pub page: u32,
@@ -159,7 +157,7 @@ impl ApiResponse<()> {
 }
 
 /// Simple message-only response data.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MessageOnly {
     pub message: String,
 }

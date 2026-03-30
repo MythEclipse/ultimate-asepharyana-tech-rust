@@ -15,10 +15,9 @@ use crate::scraping::urls::get_otakudesu_url;
 
 use serde::{Deserialize, Serialize};
 use tracing::info;
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnimeItem {
     pub title: String,
     pub slug: String,
@@ -30,7 +29,7 @@ pub struct AnimeItem {
     pub rating: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -40,33 +39,20 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SearchResponse {
     pub status: String,
     pub data: Vec<AnimeItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct SearchQuery {
     pub q: Option<String>,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[utoipa::path(
-    get,
-    params(
-        ("q" = Option<String>, Query, description = "Search parameter for filtering results", example = "sample_value")
-    ),
-    path = "/api/anime/search",
-    tag = "anime",
-    operation_id = "anime_search",
-    responses(
-        (status = 200, description = "Searches for anime based on query parameters.", body = SearchResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn search(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<SearchQuery>,

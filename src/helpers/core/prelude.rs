@@ -21,7 +21,6 @@ pub use super::pagination::{Paginated, PaginationParams};
 pub use super::response::{ApiResult, ErrorResponse, JsonResponse};
 
 // Re-export common extractors
-pub use crate::extractors::{ValidatedJson, ValidatedQuery};
 pub use crate::observability::RequestId;
 
 // Re-export database types

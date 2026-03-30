@@ -5,7 +5,6 @@
 use axum::{extract::State, response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use utoipa::ToSchema;
 
 use crate::services::images::cache::ImageCache;
 use crate::routes::AppState;
@@ -19,7 +18,7 @@ pub const OPERATION_ID: &str = "proxy_image_cache";
 pub const SUCCESS_RESPONSE_BODY: &str = "Json<ImageCacheResponse>";
 
 /// Request body for image caching
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct ImageCacheRequest {
     /// Original image URL to cache
     pub url: String,
@@ -29,7 +28,7 @@ pub struct ImageCacheRequest {
 }
 
 /// Response containing the cached URL
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize)]
 pub struct ImageCacheResponse {
     /// Whether the operation was successful
     pub success: bool,
@@ -45,20 +44,20 @@ pub struct ImageCacheResponse {
 }
 
 /// Batch request for multiple images
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct ImageCacheBatchRequest {
     /// List of image URLs to cache
     pub urls: Vec<String>,
 }
 
 /// Batch response with multiple cached URLs
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize)]
 pub struct ImageCacheBatchResponse {
     pub success: bool,
     pub results: Vec<ImageCacheResult>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize)]
 pub struct ImageCacheResult {
     pub original_url: String,
     pub cdn_url: String,
@@ -66,15 +65,6 @@ pub struct ImageCacheResult {
 }
 
 /// Cache a single image
-#[utoipa::path(
-    post,
-    path = "/api/proxy/image-cache",
-    request_body = ImageCacheRequest,
-    responses(
-        (status = 200, description = "Image cached successfully", body = ImageCacheResponse)
-    ),
-    tag = "proxy"
-)]
 pub async fn image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageCacheRequest>,
@@ -142,16 +132,6 @@ pub async fn image_cache(
 }
 
 /// Cache multiple images in batch
-#[utoipa::path(
-    post,
-    path = "/api/proxy/image-cache/batch",
-    tag = "proxy",
-    operation_id = "proxy_image_cache_batch",
-    request_body = ImageCacheBatchRequest,
-    responses(
-        (status = 200, description = "Batch image caching successful", body = ImageCacheBatchResponse)
-    )
-)]
 pub async fn image_cache_batch(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageCacheBatchRequest>,
@@ -179,14 +159,14 @@ pub async fn image_cache_batch(
 }
 
 /// Request body for deleting image cache
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct DeleteImageCacheRequest {
     /// Original image URL to delete from cache
     pub url: String,
 }
 
 /// Response for deleting image cache
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize)]
 pub struct DeleteImageCacheResponse {
     pub success: bool,
     pub original_url: String,
@@ -194,15 +174,6 @@ pub struct DeleteImageCacheResponse {
 }
 
 /// Delete an image from cache
-#[utoipa::path(
-    delete,
-    path = "/api/proxy/image-cache",
-    request_body = DeleteImageCacheRequest,
-    responses(
-        (status = 200, description = "Image cache deleted successfully", body = DeleteImageCacheResponse)
-    ),
-    tag = "proxy"
-)]
 pub async fn delete_image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<DeleteImageCacheRequest>,
@@ -227,14 +198,14 @@ pub async fn delete_image_cache(
 }
 
 /// Request body for auditing image cache
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct AuditImageCacheRequest {
     /// Original image URL to audit
     pub url: String,
 }
 
 /// Response for auditing image cache
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize)]
 pub struct AuditImageCacheResponse {
     pub success: bool,
     pub original_url: String,
@@ -245,15 +216,6 @@ pub struct AuditImageCacheResponse {
 }
 
 /// Audit an image cache entry, re-uploading if the CDN URL is inaccessible
-#[utoipa::path(
-    post,
-    path = "/api/proxy/image-cache/audit",
-    request_body = AuditImageCacheRequest,
-    responses(
-        (status = 200, description = "Image cache audited successfully", body = AuditImageCacheResponse)
-    ),
-    tag = "proxy"
-)]
 pub async fn audit_image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AuditImageCacheRequest>,

@@ -8,7 +8,6 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 // Import shared models and parsers
 use crate::models::anime2::{PaginationWithStringPages, SearchAnimeItem};
@@ -18,24 +17,11 @@ use crate::scraping::anime::cache as cache_utils;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct SearchQuery {
     pub q: Option<String>,
 }
 
-#[utoipa::path(
-    get,
-    params(
-        ("q" = Option<String>, Query, description = "Search parameter for filtering results", example = "sample_value")
-    ),
-    path = "/api/anime2/search",
-    tag = "anime2",
-    operation_id = "anime2_search",
-    responses(
-        (status = 200, description = "Searches for anime2 based on query parameters.", body = ApiResponse<Vec<SearchAnimeItem>>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn search(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<SearchQuery>,

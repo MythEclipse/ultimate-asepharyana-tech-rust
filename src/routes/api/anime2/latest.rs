@@ -8,7 +8,6 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 // Import shared models and parsers
 use crate::models::anime2::{LatestAnimeItem, Pagination};
@@ -16,26 +15,13 @@ use crate::scraping::anime2 as parsers;
 use crate::scraping::anime::cache as cache_utils;
 
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct LatestQuery {
     pub page: Option<u32>,
 }
 
 const CACHE_TTL: u64 = 120;
 
-#[utoipa::path(
-    get,
-    params(
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1)
-    ),
-    path = "/api/anime2/latest",
-    tag = "anime2",
-    operation_id = "anime2_latest",
-    responses(
-        (status = 200, description = "Get latest anime2 updates with pagination", body = ApiResponse<Vec<LatestAnimeItem>>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn latest(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<LatestQuery>,

@@ -13,10 +13,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{info, warn};
-use utoipa::ToSchema;
 
 
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FiltersApplied {
     pub genre: Option<String>,
     pub status: Option<String>,
@@ -24,7 +23,7 @@ pub struct FiltersApplied {
     pub order: String,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct FilterQuery {
     pub page: Option<u32>,
     pub genre: Option<String>,
@@ -48,23 +47,6 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap(
 
 const CACHE_TTL: u64 = 300;
 
-#[utoipa::path(
-    get,
-    params(
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1),
-        ("genre" = Option<String>, Query, description = "Parameter for resource identification", example = "sample_value"),
-        ("status" = Option<String>, Query, description = "Status filter (active, inactive, pending, etc.)", example = "sample_value"),
-        ("type" = Option<String>, Query, description = "Content type filter", example = "sample_value"),
-        ("order" = Option<String>, Query, description = "Sort direction (ascending or descending)", example = "sample_value")
-    ),
-    path = "/api/anime2/filter",
-    tag = "anime2",
-    operation_id = "anime2_filter",
-    responses(
-        (status = 200, description = "Advanced multi-filter search for anime2", body = ApiResponse<Vec<FilterAnimeItem>>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn filter(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<FilterQuery>,

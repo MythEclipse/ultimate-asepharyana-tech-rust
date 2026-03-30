@@ -7,19 +7,12 @@ use tokio::sync::Notify;
 use tokio::time::{sleep, Duration};
 use tracing::info;
 
-use crate::helpers::memory::MemoryMetrics;
-use crate::ws::RoomManager;
-
 /// Graceful shutdown coordinator.
 pub struct ShutdownCoordinator {
     /// Shutdown signal flag
     is_shutting_down: Arc<AtomicBool>,
     /// Notify for graceful shutdown
     shutdown_notify: Arc<Notify>,
-    /// Room manager for cleanup
-    room_manager: Option<Arc<RoomManager>>,
-    /// Memory metrics
-    metrics: Option<Arc<MemoryMetrics>>,
 }
 
 impl ShutdownCoordinator {
@@ -28,21 +21,7 @@ impl ShutdownCoordinator {
         Self {
             is_shutting_down: Arc::new(AtomicBool::new(false)),
             shutdown_notify: Arc::new(Notify::new()),
-            room_manager: None,
-            metrics: None,
         }
-    }
-
-    /// Set room manager for cleanup.
-    pub fn with_room_manager(mut self, manager: Arc<RoomManager>) -> Self {
-        self.room_manager = Some(manager);
-        self
-    }
-
-    /// Set memory metrics.
-    pub fn with_metrics(mut self, metrics: Arc<MemoryMetrics>) -> Self {
-        self.metrics = Some(metrics);
-        self
     }
 
     /// Check if shutdown is in progress.
@@ -100,18 +79,6 @@ impl ShutdownCoordinator {
         info!("Waiting for active requests to complete...");
         sleep(Duration::from_secs(5)).await;
 
-        // Clean up empty rooms
-        if let Some(ref manager) = self.room_manager {
-            let removed = manager.cleanup_empty_rooms();
-            info!("Cleaned up {} empty rooms", removed);
-        }
-
-        // Log final metrics
-        if let Some(ref metrics) = self.metrics {
-            info!("Final metrics:");
-            metrics.log_metrics();
-        }
-
         info!("✅ Cleanup completed");
     }
 
@@ -142,20 +109,8 @@ impl ShutdownHandle {
     }
 }
 
-/// Wait for shutdown signal and perform cleanup.
-pub async fn wait_for_shutdown_and_cleanup(
-    room_manager: Option<Arc<RoomManager>>,
-    metrics: Option<Arc<MemoryMetrics>>,
-) {
-    let mut coordinator = ShutdownCoordinator::new();
-
-    if let Some(manager) = room_manager {
-        coordinator = coordinator.with_room_manager(manager);
-    }
-
-    if let Some(m) = metrics {
-        coordinator = coordinator.with_metrics(m);
-    }
+pub async fn wait_for_shutdown_and_cleanup() {
+    let coordinator = ShutdownCoordinator::new();
 
     coordinator.wait_for_shutdown_signal().await;
     coordinator.cleanup().await;

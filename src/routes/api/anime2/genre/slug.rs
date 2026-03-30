@@ -8,14 +8,13 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
-use utoipa::ToSchema;
 
 // Import shared models and parsers
 use crate::models::anime2::{GenreAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize)]
 pub struct GenreQuery {
     pub page: Option<u32>,
     pub status: Option<String>,
@@ -24,22 +23,6 @@ pub struct GenreQuery {
 
 const CACHE_TTL: u64 = 300;
 
-#[utoipa::path(
-    get,
-    params(
-        ("genre_slug" = String, Path, description = "Parameter for resource identification", example = "sample_value"),
-        ("page" = Option<u32>, Query, description = "Page number for pagination (starts from 1)", example = 1, minimum = 1),
-        ("status" = Option<String>, Query, description = "Status filter (active, inactive, pending, etc.)", example = "sample_value"),
-        ("order" = Option<String>, Query, description = "Sort direction (ascending or descending)", example = "sample_value")
-    ),
-    path = "/api/anime2/genre/{slug}",
-    tag = "anime2",
-    operation_id = "anime2_genre_filter",
-    responses(
-        (status = 200, description = "Filter anime2 by genre with advanced options", body = ApiResponse<Vec<GenreAnimeItem>>),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
     Path(genre_slug): Path<String>,
@@ -133,5 +116,5 @@ fn parse_genre_page(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/genre/{slug}", axum::routing::get(slug))
+    router.route("/api/anime2/genre/slug", axum::routing::get(slug))
 }

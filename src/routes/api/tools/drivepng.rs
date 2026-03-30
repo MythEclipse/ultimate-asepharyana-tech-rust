@@ -5,7 +5,6 @@ use axum::{response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
-use utoipa::ToSchema;
 
 pub const ENDPOINT_METHOD: &str = "get";
 pub const ENDPOINT_PATH: &str = "/api/drivepng";
@@ -15,27 +14,17 @@ pub const OPERATION_ID: &str = "drivepng";
 pub const SUCCESS_RESPONSE_BODY: &str = "Json<ListResponse>";
 
 /// Response structure for the Drivepng endpoint.
-/// Replace `serde_json::Value` with your actual data types and implement `utoipa::ToSchema` for complex types.
-#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+/// Replace `serde_json::Value` with your actual data types and implement `utoipa::` for complex types.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListResponse {
     /// Success message
     pub message: String,
-    /// List of items - replace with actual Vec<T> where T implements ToSchema
+    /// List of items - replace with actual Vec<T> where T implements 
     pub data: Vec<serde_json::Value>,
     /// Total number of items
     pub total: Option<u64>,
 }
 
-#[utoipa::path(
-    get,
-    path = "/api/drivepng",
-    tag = "drivepng",
-    operation_id = "drivepng",
-    responses(
-        (status = 200, description = "Handles GET requests for the drivepng endpoint.", body = ListResponse),
-        (status = 500, description = "Internal Server Error", body = String)
-    )
-)]
 pub async fn drivepng() -> impl IntoResponse {
     Json(ListResponse {
         message: "Hello from drivepng!".to_string(),
