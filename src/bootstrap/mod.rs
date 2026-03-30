@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 
 use axum::Router;
-use sea_orm::{Database, DatabaseConnection};
+use sea_orm::{Database, DatabaseConnection, ConnectionTrait, Statement, DbBackend};
 use tower_http::compression::{CompressionLayer, CompressionLevel};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
@@ -54,6 +54,13 @@ impl Application {
         match crate::browser::pool::init_browser_pool(browser_config).await {
             Ok(_) => tracing::info!("✓ Browser pool initialized"),
             Err(e) => tracing::error!("⚠️ Failed to initialize browser pool: {}", e),
+        }
+
+        // Ensure database exists (MySQL only)
+        if CONFIG.database_url.starts_with("mysql") {
+            if let Err(e) = Self::ensure_database_exists().await {
+                tracing::warn!("⚠️ Failed to ensure database exists: {}. Attempting connection anyway...", e);
+            }
         }
 
         // Database
@@ -138,6 +145,40 @@ impl Application {
 
         scheduler.start().await.expect("Failed to start scheduler");
         tracing::info!("✓ Scheduler started");
+        Ok(())
+    }
+
+    async fn ensure_database_exists() -> anyhow::Result<()> {
+        let db_url = &CONFIG.database_url;
+        let parsed = url::Url::parse(db_url)
+            .map_err(|e| anyhow::anyhow!("Failed to parse DATABASE_URL: {}", e))?;
+        
+        // Extract database name and base server URL
+        let db_name = parsed.path().trim_start_matches('/');
+        if db_name.is_empty() {
+            return Ok(());
+        }
+
+        let mut server_url = parsed.clone();
+        server_url.set_path(""); // Remove database name from path
+        let server_url_str = server_url.to_string();
+
+        tracing::info!("🔍 Checking/creating database '{}'...", db_name);
+        
+        let mut opt = sea_orm::ConnectOptions::new(server_url_str);
+        opt.connect_timeout(std::time::Duration::from_secs(5))
+           .sqlx_logging(false);
+
+        let db = Database::connect(opt).await
+            .map_err(|e| anyhow::anyhow!("Failed to connect to database server: {}", e))?;
+
+        // Create table character set handling
+        let sql = format!("CREATE DATABASE IF NOT EXISTS `{}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", db_name);
+        
+        db.execute(Statement::from_string(DbBackend::MySql, sql)).await
+            .map_err(|e| anyhow::anyhow!("Failed to execute 'CREATE DATABASE': {}", e))?;
+            
+        tracing::info!("✓ Database '{}' ensured", db_name);
         Ok(())
     }
 
