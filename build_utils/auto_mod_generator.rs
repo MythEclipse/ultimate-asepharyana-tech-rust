@@ -3,6 +3,7 @@
 //! This module generates mod.rs files automatically based on discovered routes.
 
 use crate::build_utils::handler_updater::{update_handler_file, HandlerRouteInfo};
+use crate::build_utils::path_utils::sanitize_module_name;
 use crate::build_utils::route_scanner::scan_routes;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
@@ -76,7 +77,13 @@ fn generate_mod_for_directory_auto(
         if let Some(mod_name) = route.module_name() {
             if !module_names.contains(&mod_name) {
                 module_names.push(mod_name.clone());
-                pub_mods.push(format!("pub mod {};", mod_name));
+                
+                let file_name = route.file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if file_name != format!("{}.rs", mod_name) {
+                    pub_mods.push(format!("#[path = \"{}\"]\npub mod {};", file_name, mod_name));
+                } else {
+                    pub_mods.push(format!("pub mod {};", mod_name));
+                }
             }
         }
     }
@@ -93,10 +100,15 @@ fn generate_mod_for_directory_auto(
                     continue;
                 }
 
-                let mod_name = dir_name.replace('-', "_");
+                let mod_name = sanitize_module_name(dir_name);
                 if !module_names.contains(&mod_name) {
                     module_names.push(mod_name.clone());
-                    pub_mods.push(format!("pub mod {};", mod_name));
+                    if mod_name != dir_name {
+                        // Dynamic directories like [slug] need explicit path mapping to mod.rs inside folder
+                        pub_mods.push(format!("#[path = \"{}/mod.rs\"]\npub mod {};", dir_name, mod_name));
+                    } else {
+                        pub_mods.push(format!("pub mod {};", mod_name));
+                    }
                 }
             }
         }

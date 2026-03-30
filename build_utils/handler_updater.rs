@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use crate::build_utils::constants::{ENDPOINT_METADATA_REGEX, HANDLER_FN_REGEX};
+use crate::build_utils::constants::{DYNAMIC_REGEX, ENDPOINT_METADATA_REGEX, HANDLER_FN_REGEX};
 use crate::build_utils::handler_template::generate_handler_template;
 use crate::build_utils::path_utils::{
     generate_default_description, sanitize_operation_id, sanitize_tag,
@@ -126,7 +126,10 @@ fn generate_and_update_register_routes(
         .map(|c| c[1].to_string())
         .unwrap_or_else(|| _file_stem.to_string());
 
-    let route_call = format!(".route(\"{}\", axum::routing::{}({}))", path, method, func_name);
+    // Standardize path for Axum: replace [param] with {param} (Axum 0.8+)
+    let axum_path = DYNAMIC_REGEX.replace_all(&path, "{$1}").to_string();
+
+    let route_call = format!(".route(\"{}\", axum::routing::{}({}))", axum_path, method, func_name);
     let new_register_fn = format!(
         "pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {{\n    router{}\n}}",
         route_call
@@ -258,6 +261,9 @@ fn inject_openapi_metadata(
          // Keep ApiResponse<...> but it will require manual schema registration or specialized handling
     }
 
+    // Standardize path for Utoipa: replace [param] with {param}
+    let utoipa_path = DYNAMIC_REGEX.replace_all(&path, "{$1}").to_string();
+
     let utoipa_macro = format!(
         r#"#[utoipa::path(
     {},
@@ -270,7 +276,7 @@ fn inject_openapi_metadata(
     )
 )]
 "#,
-        method, path, tag, operation_id, description, response_body
+        method, utoipa_path, tag, operation_id, description, response_body
     );
 
     // 3. Inject the macro above the function

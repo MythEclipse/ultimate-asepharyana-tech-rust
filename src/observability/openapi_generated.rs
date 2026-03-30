@@ -6,66 +6,78 @@ use utoipa::OpenApi;
 
 mod handler_mod_0 { pub use crate::routes::api::proxy::croxy::fetch_with_proxy_only; pub use crate::routes::api::proxy::croxy::__path_fetch_with_proxy_only; }
 mod handler_mod_1 { pub use crate::routes::api::proxy::image_cache::image_cache; pub use crate::routes::api::proxy::image_cache::__path_image_cache; }
-mod handler_mod_2 { pub use crate::routes::api::komik::manhwa::slug::list; pub use crate::routes::api::komik::manhwa::slug::__path_list; }
-mod handler_mod_3 { pub use crate::routes::api::komik::manhua::slug::list; pub use crate::routes::api::komik::manhua::slug::__path_list; }
-mod handler_mod_4 { pub use crate::routes::api::komik::manga::slug::list; pub use crate::routes::api::komik::manga::slug::__path_list; }
-mod handler_mod_5 { pub use crate::routes::api::komik::genre::slug::slug; pub use crate::routes::api::komik::genre::slug::__path_slug; }
-mod handler_mod_6 { pub use crate::routes::api::komik::chapter::chapter; pub use crate::routes::api::komik::chapter::__path_chapter; }
-mod handler_mod_7 { pub use crate::routes::api::komik::detail::detail; pub use crate::routes::api::komik::detail::__path_detail; }
-mod handler_mod_8 { pub use crate::routes::api::komik::genre_list::genres; pub use crate::routes::api::komik::genre_list::__path_genres; }
-mod handler_mod_9 { pub use crate::routes::api::komik::popular::popular; pub use crate::routes::api::komik::popular::__path_popular; }
-mod handler_mod_10 { pub use crate::routes::api::komik::search::search; pub use crate::routes::api::komik::search::__path_search; }
-mod handler_mod_11 { pub use crate::routes::api::anime2::ongoing_anime::slug::slug; pub use crate::routes::api::anime2::ongoing_anime::slug::__path_slug; }
-mod handler_mod_12 { pub use crate::routes::api::anime2::genre::slug::slug; pub use crate::routes::api::anime2::genre::slug::__path_slug; }
-mod handler_mod_13 { pub use crate::routes::api::anime2::detail::slug::slug; pub use crate::routes::api::anime2::detail::slug::__path_slug; }
-mod handler_mod_14 { pub use crate::routes::api::anime2::complete_anime::slug::slug; pub use crate::routes::api::anime2::complete_anime::slug::__path_slug; }
-mod handler_mod_15 { pub use crate::routes::api::anime2::index::anime2; pub use crate::routes::api::anime2::index::__path_anime2; }
-mod handler_mod_16 { pub use crate::routes::api::anime2::filter::filter; pub use crate::routes::api::anime2::filter::__path_filter; }
-mod handler_mod_17 { pub use crate::routes::api::anime2::genre_list::genres; pub use crate::routes::api::anime2::genre_list::__path_genres; }
-mod handler_mod_18 { pub use crate::routes::api::anime2::latest::latest; pub use crate::routes::api::anime2::latest::__path_latest; }
-mod handler_mod_19 { pub use crate::routes::api::anime2::search::search; pub use crate::routes::api::anime2::search::__path_search; }
-mod handler_mod_20 { pub use crate::routes::api::anime::ongoing_anime::slug::slug; pub use crate::routes::api::anime::ongoing_anime::slug::__path_slug; }
-mod handler_mod_21 { pub use crate::routes::api::anime::genre::slug::slug; pub use crate::routes::api::anime::genre::slug::__path_slug; }
-mod handler_mod_22 { pub use crate::routes::api::anime::full::slug::slug; pub use crate::routes::api::anime::full::slug::__path_slug; }
-mod handler_mod_23 { pub use crate::routes::api::anime::detail::slug::slug; pub use crate::routes::api::anime::detail::slug::__path_slug; }
-mod handler_mod_24 { pub use crate::routes::api::anime::complete_anime::slug::slug; pub use crate::routes::api::anime::complete_anime::slug::__path_slug; }
-mod handler_mod_25 { pub use crate::routes::api::anime::index::anime; pub use crate::routes::api::anime::index::__path_anime; }
-mod handler_mod_26 { pub use crate::routes::api::anime::genre_list::genres; pub use crate::routes::api::anime::genre_list::__path_genres; }
-mod handler_mod_27 { pub use crate::routes::api::anime::latest::latest; pub use crate::routes::api::anime::latest::__path_latest; }
-mod handler_mod_28 { pub use crate::routes::api::anime::search::search; pub use crate::routes::api::anime::search::__path_search; }
+mod handler_mod_2 { pub use crate::routes::api::komik::search::slug::index::search; pub use crate::routes::api::komik::search::slug::index::__path_search; }
+mod handler_mod_3 { pub use crate::routes::api::komik::search::slug::page::page; pub use crate::routes::api::komik::search::slug::page::__path_page; }
+mod handler_mod_4 { pub use crate::routes::api::komik::popular::slug::popular; pub use crate::routes::api::komik::popular::slug::__path_popular; }
+mod handler_mod_5 { pub use crate::routes::api::komik::manhwa::slug::index; pub use crate::routes::api::komik::manhwa::slug::__path_index; }
+mod handler_mod_6 { pub use crate::routes::api::komik::manhua::slug::index; pub use crate::routes::api::komik::manhua::slug::__path_index; }
+mod handler_mod_7 { pub use crate::routes::api::komik::manga::slug::index; pub use crate::routes::api::komik::manga::slug::__path_index; }
+mod handler_mod_8 { pub use crate::routes::api::komik::genre::slug::index::slug; pub use crate::routes::api::komik::genre::slug::index::__path_slug; }
+mod handler_mod_9 { pub use crate::routes::api::komik::genre::slug::page::page; pub use crate::routes::api::komik::genre::slug::page::__path_page; }
+mod handler_mod_10 { pub use crate::routes::api::komik::detail::slug::slug; pub use crate::routes::api::komik::detail::slug::__path_slug; }
+mod handler_mod_11 { pub use crate::routes::api::komik::chapter::slug::slug; pub use crate::routes::api::komik::chapter::slug::__path_slug; }
+mod handler_mod_12 { pub use crate::routes::api::komik::genre_list::genres; pub use crate::routes::api::komik::genre_list::__path_genres; }
+mod handler_mod_13 { pub use crate::routes::api::anime2::search::slug::index::search; pub use crate::routes::api::anime2::search::slug::index::__path_search; }
+mod handler_mod_14 { pub use crate::routes::api::anime2::search::slug::page::page; pub use crate::routes::api::anime2::search::slug::page::__path_page; }
+mod handler_mod_15 { pub use crate::routes::api::anime2::ongoing_anime::slug::slug; pub use crate::routes::api::anime2::ongoing_anime::slug::__path_slug; }
+mod handler_mod_16 { pub use crate::routes::api::anime2::latest::slug::latest; pub use crate::routes::api::anime2::latest::slug::__path_latest; }
+mod handler_mod_17 { pub use crate::routes::api::anime2::genre::slug::index::slug; pub use crate::routes::api::anime2::genre::slug::index::__path_slug; }
+mod handler_mod_18 { pub use crate::routes::api::anime2::genre::slug::page::page; pub use crate::routes::api::anime2::genre::slug::page::__path_page; }
+mod handler_mod_19 { pub use crate::routes::api::anime2::detail::slug::slug; pub use crate::routes::api::anime2::detail::slug::__path_slug; }
+mod handler_mod_20 { pub use crate::routes::api::anime2::complete_anime::slug::slug; pub use crate::routes::api::anime2::complete_anime::slug::__path_slug; }
+mod handler_mod_21 { pub use crate::routes::api::anime2::index::anime2; pub use crate::routes::api::anime2::index::__path_anime2; }
+mod handler_mod_22 { pub use crate::routes::api::anime2::filter::filter; pub use crate::routes::api::anime2::filter::__path_filter; }
+mod handler_mod_23 { pub use crate::routes::api::anime2::genre_list::genres; pub use crate::routes::api::anime2::genre_list::__path_genres; }
+mod handler_mod_24 { pub use crate::routes::api::anime::search::slug::index::search; pub use crate::routes::api::anime::search::slug::index::__path_search; }
+mod handler_mod_25 { pub use crate::routes::api::anime::search::slug::page::page; pub use crate::routes::api::anime::search::slug::page::__path_page; }
+mod handler_mod_26 { pub use crate::routes::api::anime::ongoing_anime::slug::slug; pub use crate::routes::api::anime::ongoing_anime::slug::__path_slug; }
+mod handler_mod_27 { pub use crate::routes::api::anime::latest::slug::latest; pub use crate::routes::api::anime::latest::slug::__path_latest; }
+mod handler_mod_28 { pub use crate::routes::api::anime::genre::slug::index::slug; pub use crate::routes::api::anime::genre::slug::index::__path_slug; }
+mod handler_mod_29 { pub use crate::routes::api::anime::genre::slug::page::page; pub use crate::routes::api::anime::genre::slug::page::__path_page; }
+mod handler_mod_30 { pub use crate::routes::api::anime::full::slug::slug; pub use crate::routes::api::anime::full::slug::__path_slug; }
+mod handler_mod_31 { pub use crate::routes::api::anime::detail::slug::slug; pub use crate::routes::api::anime::detail::slug::__path_slug; }
+mod handler_mod_32 { pub use crate::routes::api::anime::complete_anime::slug::slug; pub use crate::routes::api::anime::complete_anime::slug::__path_slug; }
+mod handler_mod_33 { pub use crate::routes::api::anime::index::anime; pub use crate::routes::api::anime::index::__path_anime; }
+mod handler_mod_34 { pub use crate::routes::api::anime::genre_list::genres; pub use crate::routes::api::anime::genre_list::__path_genres; }
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
         handler_mod_0::fetch_with_proxy_only,
         handler_mod_1::image_cache,
-        handler_mod_2::list,
-        handler_mod_3::list,
-        handler_mod_4::list,
-        handler_mod_5::slug,
-        handler_mod_6::chapter,
-        handler_mod_7::detail,
-        handler_mod_8::genres,
-        handler_mod_9::popular,
-        handler_mod_10::search,
+        handler_mod_2::search,
+        handler_mod_3::page,
+        handler_mod_4::popular,
+        handler_mod_5::index,
+        handler_mod_6::index,
+        handler_mod_7::index,
+        handler_mod_8::slug,
+        handler_mod_9::page,
+        handler_mod_10::slug,
         handler_mod_11::slug,
-        handler_mod_12::slug,
-        handler_mod_13::slug,
-        handler_mod_14::slug,
-        handler_mod_15::anime2,
-        handler_mod_16::filter,
-        handler_mod_17::genres,
-        handler_mod_18::latest,
-        handler_mod_19::search,
+        handler_mod_12::genres,
+        handler_mod_13::search,
+        handler_mod_14::page,
+        handler_mod_15::slug,
+        handler_mod_16::latest,
+        handler_mod_17::slug,
+        handler_mod_18::page,
+        handler_mod_19::slug,
         handler_mod_20::slug,
-        handler_mod_21::slug,
-        handler_mod_22::slug,
-        handler_mod_23::slug,
-        handler_mod_24::slug,
-        handler_mod_25::anime,
-        handler_mod_26::genres,
+        handler_mod_21::anime2,
+        handler_mod_22::filter,
+        handler_mod_23::genres,
+        handler_mod_24::search,
+        handler_mod_25::page,
+        handler_mod_26::slug,
         handler_mod_27::latest,
-        handler_mod_28::search,
+        handler_mod_28::slug,
+        handler_mod_29::page,
+        handler_mod_30::slug,
+        handler_mod_31::slug,
+        handler_mod_32::slug,
+        handler_mod_33::anime,
+        handler_mod_34::genres,
     ),
     components(
         schemas(
@@ -78,13 +90,13 @@ mod handler_mod_28 { pub use crate::routes::api::anime::search::search; pub use 
             crate::routes::api::anime2::detail::slug::Recommendation,
             crate::routes::api::anime2::filter::FilterQuery,
             crate::routes::api::anime2::filter::FiltersApplied,
-            crate::routes::api::anime2::genre::slug::GenreQuery,
+            crate::routes::api::anime2::genre::slug::index::GenreQuery,
+            crate::routes::api::anime2::genre::slug::page::GenreQuery,
             crate::routes::api::anime2::genre_list::Genre,
             crate::routes::api::anime2::genre_list::GenresResponse,
             crate::routes::api::anime2::index::Anime2Data,
             crate::routes::api::anime2::index::Anime2Response,
-            crate::routes::api::anime2::latest::LatestQuery,
-            crate::routes::api::anime2::search::SearchQuery,
+            crate::routes::api::anime2::search::slug::index::SearchQuery,
             crate::routes::api::anime::complete_anime::slug::CompleteAnimeItem,
             crate::routes::api::anime::complete_anime::slug::ListResponse,
             crate::routes::api::anime::complete_anime::slug::Pagination,
@@ -98,39 +110,47 @@ mod handler_mod_28 { pub use crate::routes::api::anime::search::search; pub use 
             crate::routes::api::anime::full::slug::DownloadLink,
             crate::routes::api::anime::full::slug::EpisodeInfo,
             crate::routes::api::anime::full::slug::FullResponse,
-            crate::routes::api::anime::genre::slug::AnimeItem,
-            crate::routes::api::anime::genre::slug::GenreAnimeResponse,
-            crate::routes::api::anime::genre::slug::GenreQuery,
-            crate::routes::api::anime::genre::slug::Pagination,
+            crate::routes::api::anime::genre::slug::index::AnimeItem,
+            crate::routes::api::anime::genre::slug::index::GenreAnimeResponse,
+            crate::routes::api::anime::genre::slug::index::GenreQuery,
+            crate::routes::api::anime::genre::slug::index::Pagination,
+            crate::routes::api::anime::genre::slug::page::AnimeItem,
+            crate::routes::api::anime::genre::slug::page::GenreAnimeResponse,
+            crate::routes::api::anime::genre::slug::page::GenreQuery,
+            crate::routes::api::anime::genre::slug::page::Pagination,
             crate::routes::api::anime::genre_list::Genre,
             crate::routes::api::anime::genre_list::GenresResponse,
             crate::routes::api::anime::index::AnimeData,
             crate::routes::api::anime::index::CompleteAnimeItem,
             crate::routes::api::anime::index::OngoingAnimeItem,
-            crate::routes::api::anime::latest::LatestAnimeItem,
-            crate::routes::api::anime::latest::LatestAnimeResponse,
-            crate::routes::api::anime::latest::LatestQuery,
-            crate::routes::api::anime::latest::Pagination,
+            crate::routes::api::anime::latest::slug::LatestAnimeItem,
+            crate::routes::api::anime::latest::slug::LatestAnimeResponse,
+            crate::routes::api::anime::latest::slug::Pagination,
             crate::routes::api::anime::ongoing_anime::slug::OngoingAnimeItem,
             crate::routes::api::anime::ongoing_anime::slug::OngoingAnimeResponse,
             crate::routes::api::anime::ongoing_anime::slug::Pagination,
-            crate::routes::api::anime::search::AnimeItem,
-            crate::routes::api::anime::search::Pagination,
-            crate::routes::api::anime::search::SearchQuery,
-            crate::routes::api::anime::search::SearchResponse,
-            crate::routes::api::komik::chapter::ChapterData,
-            crate::routes::api::komik::chapter::ChapterQuery,
-            crate::routes::api::komik::chapter::ChapterResponse,
-            crate::routes::api::komik::detail::Chapter,
-            crate::routes::api::komik::detail::DetailData,
-            crate::routes::api::komik::detail::DetailQuery,
-            crate::routes::api::komik::detail::DetailResponse,
-            crate::routes::api::komik::detail::KomikDetailEvent,
-            crate::routes::api::komik::detail::KomikDetailRequest,
-            crate::routes::api::komik::genre::slug::GenreKomikResponse,
-            crate::routes::api::komik::genre::slug::GenreQuery,
-            crate::routes::api::komik::genre::slug::KomikItem,
-            crate::routes::api::komik::genre::slug::Pagination,
+            crate::routes::api::anime::search::slug::index::AnimeItem,
+            crate::routes::api::anime::search::slug::index::Pagination,
+            crate::routes::api::anime::search::slug::index::SearchQuery,
+            crate::routes::api::anime::search::slug::index::SearchResponse,
+            crate::routes::api::anime::search::slug::page::AnimeItem,
+            crate::routes::api::anime::search::slug::page::Pagination,
+            crate::routes::api::anime::search::slug::page::SearchQuery,
+            crate::routes::api::anime::search::slug::page::SearchResponse,
+            crate::routes::api::komik::chapter::slug::ChapterData,
+            crate::routes::api::komik::chapter::slug::ChapterQuery,
+            crate::routes::api::komik::chapter::slug::ChapterResponse,
+            crate::routes::api::komik::detail::slug::Chapter,
+            crate::routes::api::komik::detail::slug::DetailData,
+            crate::routes::api::komik::detail::slug::DetailResponse,
+            crate::routes::api::komik::detail::slug::KomikDetailEvent,
+            crate::routes::api::komik::detail::slug::KomikDetailRequest,
+            crate::routes::api::komik::genre::slug::index::GenreKomikResponse,
+            crate::routes::api::komik::genre::slug::index::KomikItem,
+            crate::routes::api::komik::genre::slug::index::Pagination,
+            crate::routes::api::komik::genre::slug::page::GenreKomikResponse,
+            crate::routes::api::komik::genre::slug::page::KomikItem,
+            crate::routes::api::komik::genre::slug::page::Pagination,
             crate::routes::api::komik::genre_list::Genre,
             crate::routes::api::komik::genre_list::GenresResponse,
             crate::routes::api::komik::manga::slug::MangaItem,
@@ -140,19 +160,19 @@ mod handler_mod_28 { pub use crate::routes::api::anime::search::search; pub use 
             crate::routes::api::komik::manhua::slug::ManhuaItem,
             crate::routes::api::komik::manhua::slug::ManhuaResponse,
             crate::routes::api::komik::manhua::slug::Pagination,
-            crate::routes::api::komik::manhua::slug::QueryParams,
             crate::routes::api::komik::manhwa::slug::ManhwaItem,
             crate::routes::api::komik::manhwa::slug::ManhwaResponse,
             crate::routes::api::komik::manhwa::slug::Pagination,
-            crate::routes::api::komik::manhwa::slug::QueryParams,
-            crate::routes::api::komik::popular::Pagination,
-            crate::routes::api::komik::popular::PopularKomikItem,
-            crate::routes::api::komik::popular::PopularKomikResponse,
-            crate::routes::api::komik::popular::PopularQuery,
-            crate::routes::api::komik::search::MangaItem,
-            crate::routes::api::komik::search::Pagination,
-            crate::routes::api::komik::search::SearchQuery,
-            crate::routes::api::komik::search::SearchResponse,
+            crate::routes::api::komik::popular::slug::Pagination,
+            crate::routes::api::komik::popular::slug::PopularKomikItem,
+            crate::routes::api::komik::popular::slug::PopularKomikResponse,
+            crate::routes::api::komik::popular::slug::PopularQuery,
+            crate::routes::api::komik::search::slug::index::MangaItem,
+            crate::routes::api::komik::search::slug::index::Pagination,
+            crate::routes::api::komik::search::slug::index::SearchResponse,
+            crate::routes::api::komik::search::slug::page::MangaItem,
+            crate::routes::api::komik::search::slug::page::Pagination,
+            crate::routes::api::komik::search::slug::page::SearchResponse,
             crate::routes::api::proxy::croxy::ProxyParams,
             crate::routes::api::proxy::image_cache::AuditImageCacheRequest,
             crate::routes::api::proxy::image_cache::AuditImageCacheResponse,

@@ -1,15 +1,14 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use axum::{
     extract::{Query, State},
-    response::Response,
-    Router,
-};
+    response::Response};
 use http::StatusCode;
 use serde::Deserialize;
 use utoipa::ToSchema;
-use std::sync::Arc;
 
 use crate::infra::proxy::fetch_with_proxy;
-use crate::routes::AppState;
 use crate::core::error::AppError;
 
 

@@ -1,14 +1,15 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
 use crate::helpers::scraping::{selector, text_from_or, attr_from};
-use crate::routes::AppState;
 use crate::scraping::urls::get_komik_api_url;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{response::IntoResponse, Json};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 use tracing::info;
 
 
@@ -27,25 +28,36 @@ pub struct GenresResponse {
 
 const CACHE_TTL: u64 = 3600;
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/komik/genre_list",
+
 
     tag = "komik",
 
+
     operation_id = "komik_genre_list",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/komik/genre_list endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

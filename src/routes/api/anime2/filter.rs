@@ -1,10 +1,11 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use crate::helpers::api_response::{internal_err, ApiResult, ApiResponse};
 use crate::helpers::{default_backoff, transient, Cache};
 use crate::infra::proxy::fetch_with_proxy;
 use crate::models::anime2::{FilterAnimeItem, Pagination};
-use crate::routes::AppState;
 use axum::extract::{Query, State};
-use axum::Router;
 use backoff::future::retry;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -12,7 +13,6 @@ use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use serde_json::json;
-use std::sync::Arc;
 use tracing::{info, warn};
 
 
@@ -48,25 +48,36 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap(
 
 const CACHE_TTL: u64 = 300;
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/anime2/filter",
+
 
     tag = "anime2",
 
+
     operation_id = "anime2_filter",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/anime2/filter endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn filter(
     State(app_state): State<Arc<AppState>>,

@@ -1,13 +1,14 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
 use crate::helpers::scraping::{selector, extract_slug, text, attr};
-use crate::routes::AppState;
 use crate::scraping::urls::get_otakudesu_url;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 use tracing::info;
 
 
@@ -26,25 +27,36 @@ pub struct GenresResponse {
 
 const CACHE_TTL: u64 = 3600; // 1 hour - genres don't change often
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/anime/genre_list",
+
 
     tag = "anime",
 
+
     operation_id = "anime_genre_list",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/anime/genre_list endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

@@ -1,13 +1,11 @@
 use utoipa::OpenApi;
-use crate::observability::openapi_generated::GeneratedApiDoc;
+
 
 /// Bridge for the auto-generated OpenAPI documentation.
 /// This allows merging manual schema definitions with the auto-discovered handlers and schemas.
 #[derive(OpenApi)]
 #[openapi(
-    nest(
-        (path = "/", api = GeneratedApiDoc)
-    ),
+    // Discovered routes are merged at runtime in bootstrap/mod.rs
     info(
         title = "RustExpress API",
         version = "1.0.0",

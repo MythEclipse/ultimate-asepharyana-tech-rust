@@ -99,10 +99,14 @@ impl Application {
         // Scheduler
         Self::init_scheduler(db_arc.clone()).await?;
 
+        // OpenApi merging
+        let mut openapi = ApiDoc::openapi();
+        openapi.merge(crate::observability::openapi_generated::GeneratedApiDoc::openapi());
+
         // Router
         let app = crate::routes::api::register_routes(Router::new())
             .route("/metrics", axum::routing::get(move || async move { metric_handle.render() }))
-            .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", openapi))
             .with_state(app_state.clone())
             .layer(prometheus_layer)
             .layer(CompressionLayer::new().quality(CompressionLevel::Fastest))

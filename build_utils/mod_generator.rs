@@ -44,7 +44,12 @@ fn process_directory_entries(
             )?;
 
             if has_routes {
-                pub_mods.push(format!("pub mod {};", mod_name));
+                if mod_name != file_name {
+                    // Dynamic directories like [slug] need explicit path mapping to mod.rs inside folder
+                    pub_mods.push(format!("#[path = \"{}/mod.rs\"]\npub mod {};", file_name, mod_name));
+                } else {
+                    pub_mods.push(format!("pub mod {};", mod_name));
+                }
                 route_registrations.push(mod_name.clone());
 
                 // If this is the root level, add to modules

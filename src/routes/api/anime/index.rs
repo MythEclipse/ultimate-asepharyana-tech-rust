@@ -1,15 +1,16 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use crate::core::types::ApiResponse;
 use crate::helpers::{parse_html, Cache, fetch_html_with_retry, text_from_or, attr_from_or, selector, extract_slug, attr_from};
 
-use crate::routes::AppState;
 use crate::core::error::AppError;
 use crate::scraping::urls::get_otakudesu_url;
 use axum::extract::State;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{response::IntoResponse, Json};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 use tracing::{info};
 
 
@@ -43,25 +44,36 @@ pub type EmptyResponse = ApiResponse<()>;
 use crate::helpers::cache_ttl::CACHE_TTL_VERY_SHORT;
 const CACHE_TTL: u64 = CACHE_TTL_VERY_SHORT; // 5 minutes
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/anime",
+
 
     tag = "anime",
 
+
     operation_id = "anime_index",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/anime endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn anime(
     State(app_state): State<Arc<AppState>>,

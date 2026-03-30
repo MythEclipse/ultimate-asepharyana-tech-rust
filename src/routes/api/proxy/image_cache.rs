@@ -1,14 +1,14 @@
 //! Image cache API endpoint
 //!
 //! POST /api/proxy/image-cache - Cache an image and return CDN URL
-
-use axum::{extract::State, response::IntoResponse, Json, Router};
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
+use axum::{extract::State, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 
 use crate::services::images::cache::ImageCache;
-use crate::routes::AppState;
 use crate::events::bus::ImageRepaired;
 
 pub const ENDPOINT_METHOD: &str = "post";
@@ -368,10 +368,7 @@ pub async fn audit_image_cache(
 }
 
 /// Register routes for this endpoint
+
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router
-        .route("/api/proxy/image-cache", axum::routing::post(image_cache))
-        .route("/api/proxy/image-cache", axum::routing::delete(delete_image_cache))
-        .route("/api/proxy/image-cache/batch", axum::routing::post(image_cache_batch))
-        .route("/api/proxy/image-cache/audit", axum::routing::post(audit_image_cache))
+    router.route("/api/proxy/image-cache", axum::routing::post(image_cache))
 }

@@ -1,15 +1,16 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::routes::AppState;
 use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
 use crate::helpers::scraping::{selector, text, attr};
-use crate::routes::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{response::IntoResponse, Json};
 
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 use tracing::info;
 
 
@@ -29,25 +30,36 @@ static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"genre-(.+)$").unwrap(
 
 const CACHE_TTL: u64 = 3600; // 1 hour
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/anime2/genre_list",
+
 
     tag = "anime2",
 
+
     operation_id = "anime2_genre_list",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/anime2/genre_list endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

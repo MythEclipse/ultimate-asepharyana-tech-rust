@@ -1,12 +1,13 @@
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry};
+use axum::Router;
+use std::sync::Arc;
 use crate::routes::AppState;
+use crate::helpers::{internal_err, Cache, fetch_html_with_retry};
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{response::IntoResponse, Json, Router};
+use axum::{response::IntoResponse, Json};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use std::sync::Arc;
 use tracing::info;
 
 // Import shared models and parsers
@@ -30,25 +31,36 @@ pub struct Anime2Response {
 const CACHE_KEY: &str = "anime2:index";
 const CACHE_TTL: u64 = 300;
 
+
 #[utoipa::path(
+
 
     get,
 
+
     path = "/api/anime2",
+
 
     tag = "anime2",
 
+
     operation_id = "anime2_index",
+
 
     responses(
 
+
         (status = 200, description = "Handles GET requests for the /api/anime2 endpoint.", body = serde_json::Value),
+
 
         (status = 500, description = "Internal Server Error", body = String)
 
+
     )
 
+
 )]
+
 
 pub async fn anime2(
     State(app_state): State<Arc<AppState>>,
