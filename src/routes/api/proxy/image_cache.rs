@@ -370,5 +370,7 @@ pub async fn audit_image_cache(
 /// Register routes for this endpoint
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/proxy/image-cache", axum::routing::post(image_cache))
+    router
+        .route("/api/proxy/image-cache", axum::routing::post(image_cache))
+        .route("/api/proxy/image-cache/audit", axum::routing::post(audit_image_cache))
 }
