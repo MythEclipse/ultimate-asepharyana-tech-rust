@@ -601,11 +601,11 @@ impl ImageCache {
             .await
             .map_err(|e| format!("Failed to read bytes: {}", e))?;
 
-        // Structural verification (is it really an image?)
-        if image::load_from_memory(&bytes).is_ok() {
+        // Structural verification (Fast MIME check)
+        if infer::get(&bytes).map(|k| k.mime_type().starts_with("image/")).unwrap_or(false) {
             Ok(true)
         } else {
-            warn!("ImageCache: CDN URL {} returned invalid/corrupt image data during verification", cdn_url);
+            warn!("ImageCache: CDN URL {} returned invalid content during verification", cdn_url);
             Ok(false)
         }
     }

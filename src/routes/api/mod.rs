@@ -5,7 +5,6 @@ pub mod anime2;
 pub mod anime;
 pub mod komik;
 pub mod proxy;
-pub mod tools;
 
 /// Register routes for this directory
 use axum::Router;
@@ -13,5 +12,5 @@ use std::sync::Arc;
 use crate::routes::AppState;
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    anime::register_routes(anime2::register_routes(komik::register_routes(proxy::register_routes(tools::register_routes(router)))))
+    anime::register_routes(anime2::register_routes(komik::register_routes(proxy::register_routes(router))))
 }

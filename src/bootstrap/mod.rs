@@ -55,8 +55,8 @@ impl Application {
 
         // Database
         let mut opt = sea_orm::ConnectOptions::new(CONFIG.database_url.clone());
-        opt.max_connections(CONFIG.db.max_connections)
-            .min_connections(CONFIG.db.min_connections)
+        opt.max_connections(20)
+            .min_connections(1)
             .connect_timeout(std::time::Duration::from_secs(CONFIG.db.connect_timeout_seconds))
             .idle_timeout(std::time::Duration::from_secs(CONFIG.db.idle_timeout_seconds))
             .acquire_timeout(std::time::Duration::from_secs(CONFIG.db.acquire_timeout_seconds))

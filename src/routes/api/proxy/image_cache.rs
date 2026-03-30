@@ -243,11 +243,11 @@ pub async fn audit_image_cache(
         match client.get(cdn_url.clone()).send().await {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(bytes) = resp.bytes().await {
-                    // Perform structural verification using the image crate
-                    if image::load_from_memory(&bytes).is_ok() {
+                    // Perform structural verification (Fast MIME check)
+                    if infer::get(&bytes).map(|k| k.mime_type().starts_with("image/")).unwrap_or(false) {
                         is_accessible_and_valid = true;
                     } else {
-                        tracing::warn!("CDN URL {} for {} returned invalid/corrupt image data.", cdn_url, actual_original_url);
+                        tracing::warn!("CDN URL {} for {} returned invalid content.", cdn_url, actual_original_url);
                     }
                 }
             },
