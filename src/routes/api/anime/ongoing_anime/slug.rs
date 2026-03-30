@@ -15,10 +15,11 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct OngoingAnimeItem {
     pub title: String,
     pub slug: String,
@@ -27,7 +28,7 @@ pub struct OngoingAnimeItem {
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -37,7 +38,7 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct OngoingAnimeResponse {
     pub status: String,
     pub data: Vec<OngoingAnimeItem>,
@@ -45,6 +46,26 @@ pub struct OngoingAnimeResponse {
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/ongoing_anime/slug",
+
+    tag = "anime",
+
+    operation_id = "anime_ongoing_anime_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/ongoing_anime/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,

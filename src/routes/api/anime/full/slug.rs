@@ -10,27 +10,28 @@ use axum::{
 };
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeInfo {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct EpisodeInfo {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DownloadLink {
     pub server: String,
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeFullData {
     pub episode: String,
     pub episode_number: String,
@@ -44,13 +45,33 @@ pub struct AnimeFullData {
     pub image_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct FullResponse {
     pub status: String,
     pub data: AnimeFullData,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/full/slug",
+
+    tag = "anime",
+
+    operation_id = "anime_full_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/full/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,

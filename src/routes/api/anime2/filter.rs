@@ -10,12 +10,13 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{info, warn};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct FiltersApplied {
     pub genre: Option<String>,
     pub status: Option<String>,
@@ -23,7 +24,7 @@ pub struct FiltersApplied {
     pub order: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct FilterQuery {
     pub page: Option<u32>,
     pub genre: Option<String>,
@@ -46,6 +47,26 @@ static NEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse(".pagination
 static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap());
 
 const CACHE_TTL: u64 = 300;
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/filter",
+
+    tag = "anime2",
+
+    operation_id = "anime2_filter",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2/filter endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn filter(
     State(app_state): State<Arc<AppState>>,

@@ -11,6 +11,9 @@ use tracing_subscriber::EnvFilter;
 use crate::core::config::CONFIG;
 use crate::infra::redis::REDIS_POOL;
 use crate::routes::AppState;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+use crate::observability::openapi::ApiDoc;
 
 pub struct Application {
     pub port: u16,
@@ -99,6 +102,7 @@ impl Application {
         // Router
         let app = crate::routes::api::register_routes(Router::new())
             .route("/metrics", axum::routing::get(move || async move { metric_handle.render() }))
+            .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
             .with_state(app_state.clone())
             .layer(prometheus_layer)
             .layer(CompressionLayer::new().quality(CompressionLevel::Fastest))

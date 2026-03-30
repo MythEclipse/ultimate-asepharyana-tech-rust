@@ -10,11 +10,12 @@ use axum::http::StatusCode;
 use axum::{extract::Query, Json, Router};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::{info};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ChapterData {
     pub title: String,
     pub next_chapter_id: String,
@@ -23,19 +24,39 @@ pub struct ChapterData {
     pub images: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ChapterResponse {
     pub message: String,
     pub data: ChapterData,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ChapterQuery {
     /// URL-friendly identifier for the chapter (typically the chapter slug or URL path)
     pub chapter_url: Option<String>,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/chapter",
+
+    tag = "komik",
+
+    operation_id = "komik_chapter",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/komik/chapter endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn chapter(
     State(app_state): State<Arc<AppState>>,

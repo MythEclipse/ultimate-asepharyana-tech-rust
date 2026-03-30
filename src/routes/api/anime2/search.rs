@@ -5,6 +5,7 @@ use axum::extract::State;
 use axum::{extract::Query, Router};
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
@@ -17,10 +18,30 @@ use crate::scraping::anime::cache as cache_utils;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SearchQuery {
     pub q: Option<String>,
 }
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/search",
+
+    tag = "anime2",
+
+    operation_id = "anime2_search",
+
+    responses(
+
+        (status = 200, description = "Searches for anime2 based on query parameters.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn search(
     State(app_state): State<Arc<AppState>>,

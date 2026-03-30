@@ -22,6 +22,26 @@ use crate::scraping::anime2 as parsers;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
 
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/complete_anime/slug",
+
+    tag = "anime2",
+
+    operation_id = "anime2_complete_anime_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2/complete_anime/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
+
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
     Path(slug): Path<String>,

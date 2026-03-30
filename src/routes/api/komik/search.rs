@@ -8,6 +8,7 @@ use axum::{extract::Query, response::IntoResponse, Json, Router};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
@@ -38,7 +39,7 @@ static PAGE_SELECTORS: Lazy<scraper::Selector> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct MangaItem {
     pub title: String,
     pub poster: String,
@@ -49,7 +50,7 @@ pub struct MangaItem {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -59,13 +60,13 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct SearchResponse {
     pub data: Vec<MangaItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SearchQuery {
     pub query: Option<String>,
     pub page: Option<u32>,
@@ -74,6 +75,26 @@ pub struct SearchQuery {
 use axum::extract::State;
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/search",
+
+    tag = "komik",
+
+    operation_id = "komik_search",
+
+    responses(
+
+        (status = 200, description = "Searches for komik based on query parameters.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn search(
     State(app_state): State<Arc<AppState>>,

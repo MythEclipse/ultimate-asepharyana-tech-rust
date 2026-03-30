@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // ============================================================================
 // PAGINATION MODELS
 // ============================================================================
 
 /// Common pagination structure used across all anime2 endpoints
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -37,7 +38,7 @@ impl Pagination {
 }
 
 /// Pagination variant with string-based page numbers (used in search endpoint)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct PaginationWithStringPages {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -52,7 +53,7 @@ pub struct PaginationWithStringPages {
 // ============================================================================
 
 /// Anime item for ongoing anime listings
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct OngoingAnimeItem {
     pub title: String,
     pub slug: String,
@@ -62,7 +63,7 @@ pub struct OngoingAnimeItem {
 }
 
 /// Anime item for ongoing anime with score (used in paginated ongoing lists)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct OngoingAnimeItemWithScore {
     pub title: String,
     pub slug: String,
@@ -72,7 +73,7 @@ pub struct OngoingAnimeItemWithScore {
 }
 
 /// Anime item for complete anime listings
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct CompleteAnimeItem {
     pub title: String,
     pub slug: String,
@@ -82,7 +83,7 @@ pub struct CompleteAnimeItem {
 }
 
 /// Anime item for latest anime listings with episode and score
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct LatestAnimeItem {
     pub title: String,
     pub slug: String,
@@ -93,7 +94,7 @@ pub struct LatestAnimeItem {
 }
 
 /// Anime item for search results with full metadata
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct SearchAnimeItem {
     pub title: String,
     pub slug: String,
@@ -107,7 +108,7 @@ pub struct SearchAnimeItem {
 }
 
 /// Anime item for genre filtering
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GenreAnimeItem {
     pub title: String,
     pub slug: String,
@@ -118,7 +119,7 @@ pub struct GenreAnimeItem {
 }
 
 /// Anime item for advanced filtering (used in filter endpoint)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct FilterAnimeItem {
     pub title: String,
     pub slug: String,

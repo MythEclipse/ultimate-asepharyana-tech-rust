@@ -5,6 +5,7 @@ use axum::extract::{Query, State};
 use axum::{extract::Path, Router};
 
 use serde::Deserialize;
+use utoipa::ToSchema;
 use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
@@ -14,7 +15,7 @@ use crate::models::anime2::{GenreAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct GenreQuery {
     pub page: Option<u32>,
     pub status: Option<String>,
@@ -22,6 +23,26 @@ pub struct GenreQuery {
 }
 
 const CACHE_TTL: u64 = 300;
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/genre/slug",
+
+    tag = "anime2",
+
+    operation_id = "anime2_genre_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2/genre/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,

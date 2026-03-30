@@ -27,10 +27,11 @@ static NEXT_SELECTOR: Lazy<scraper::Selector> =
 static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap());
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct PopularKomikItem {
     pub rank: u32,
     pub title: String,
@@ -42,7 +43,7 @@ pub struct PopularKomikItem {
     pub komik_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -52,7 +53,7 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct PopularKomikResponse {
     pub status: String,
     pub period: String,
@@ -60,13 +61,33 @@ pub struct PopularKomikResponse {
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct PopularQuery {
     pub page: Option<u32>,
     pub period: Option<String>,
 }
 
 const CACHE_TTL: u64 = 600;
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/popular",
+
+    tag = "komik",
+
+    operation_id = "komik_popular",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/komik/popular endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn popular(
     State(app_state): State<Arc<AppState>>,

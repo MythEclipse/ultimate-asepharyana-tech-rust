@@ -7,30 +7,31 @@ use axum::http::StatusCode;
 use axum::{extract::Path, response::IntoResponse, Json, Router};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::{info};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Link {
     pub name: String,
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DownloadItem {
     pub resolution: String,
     pub links: Vec<Link>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Recommendation {
     pub title: String,
     pub slug: String,
@@ -39,7 +40,7 @@ pub struct Recommendation {
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeDetailData {
     pub title: String,
     pub alternative_title: String,
@@ -58,13 +59,33 @@ pub struct AnimeDetailData {
     pub downloads: Vec<DownloadItem>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DetailResponse {
     pub status: String,
     pub data: AnimeDetailData,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/detail/slug",
+
+    tag = "anime2",
+
+    operation_id = "anime2_detail_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2/detail/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,

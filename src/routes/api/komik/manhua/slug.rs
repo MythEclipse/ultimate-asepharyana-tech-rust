@@ -10,11 +10,12 @@ use axum::{extract::Query, response::IntoResponse, Json, Router};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::{info};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ManhuaItem {
     pub title: String,
     pub poster: String,
@@ -25,7 +26,7 @@ pub struct ManhuaItem {
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -35,19 +36,39 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct ManhuaResponse {
     pub data: Vec<ManhuaItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct QueryParams {
     /// Page number for pagination (defaults to 1)
     pub page: Option<u32>,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/manhua/slug",
+
+    tag = "komik",
+
+    operation_id = "komik_manhua_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/komik/manhua/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn list(
     State(app_state): State<Arc<AppState>>,

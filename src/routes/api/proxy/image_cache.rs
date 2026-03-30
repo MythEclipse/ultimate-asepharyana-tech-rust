@@ -4,6 +4,7 @@
 
 use axum::{extract::State, response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::services::images::cache::ImageCache;
@@ -18,7 +19,7 @@ pub const OPERATION_ID: &str = "proxy_image_cache";
 pub const SUCCESS_RESPONSE_BODY: &str = "Json<ImageCacheResponse>";
 
 /// Request body for image caching
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ImageCacheRequest {
     /// Original image URL to cache
     pub url: String,
@@ -28,7 +29,7 @@ pub struct ImageCacheRequest {
 }
 
 /// Response containing the cached URL
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ImageCacheResponse {
     /// Whether the operation was successful
     pub success: bool,
@@ -44,20 +45,20 @@ pub struct ImageCacheResponse {
 }
 
 /// Batch request for multiple images
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ImageCacheBatchRequest {
     /// List of image URLs to cache
     pub urls: Vec<String>,
 }
 
 /// Batch response with multiple cached URLs
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ImageCacheBatchResponse {
     pub success: bool,
     pub results: Vec<ImageCacheResult>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ImageCacheResult {
     pub original_url: String,
     pub cdn_url: String,
@@ -65,6 +66,16 @@ pub struct ImageCacheResult {
 }
 
 /// Cache a single image
+#[utoipa::path(
+    post,
+    path = "/api/proxy/image-cache",
+    tag = "proxy",
+    operation_id = "proxy_image_cache",
+    responses(
+        (status = 200, description = "Cache an image to CDN and return the cached URL", body = ImageCacheResponse),
+        (status = 500, description = "Internal Server Error", body = String)
+    )
+)]
 pub async fn image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageCacheRequest>,
@@ -160,14 +171,14 @@ pub async fn image_cache_batch(
 }
 
 /// Request body for deleting image cache
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeleteImageCacheRequest {
     /// Original image URL to delete from cache
     pub url: String,
 }
 
 /// Response for deleting image cache
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct DeleteImageCacheResponse {
     pub success: bool,
     pub original_url: String,
@@ -199,14 +210,14 @@ pub async fn delete_image_cache(
 }
 
 /// Request body for auditing image cache
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AuditImageCacheRequest {
     /// Original image URL to audit
     pub url: String,
 }
 
 /// Response for auditing image cache
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AuditImageCacheResponse {
     pub success: bool,
     pub original_url: String,

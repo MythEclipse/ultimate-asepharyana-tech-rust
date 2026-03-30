@@ -72,6 +72,9 @@ sha2 = "0.10.9"
 log = "0.4"
 walkdir = "2.5"
 metrics-exporter-prometheus = "0.18.1"
+utoipa = { version = "5.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+utoipa-axum = "0.2.0"
 
 
 # Dependensi yang hanya dibutuhkan untuk build script (build.rs)

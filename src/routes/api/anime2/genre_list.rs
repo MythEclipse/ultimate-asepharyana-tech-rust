@@ -8,17 +8,18 @@ use axum::{response::IntoResponse, Json, Router};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GenresResponse {
     pub status: String,
     pub data: Vec<Genre>,
@@ -27,6 +28,26 @@ pub struct GenresResponse {
 static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"genre-(.+)$").unwrap());
 
 const CACHE_TTL: u64 = 3600; // 1 hour
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2/genre_list",
+
+    tag = "anime2",
+
+    operation_id = "anime2_genre_list",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2/genre_list endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

@@ -5,12 +5,13 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 const CACHE_TTL: u64 = 120; // 2 minutes - latest updates change frequently
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct LatestAnimeItem {
     pub title: String,
     pub slug: String,
@@ -20,7 +21,7 @@ pub struct LatestAnimeItem {
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -30,17 +31,37 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct LatestAnimeResponse {
     pub status: String,
     pub data: Vec<LatestAnimeItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LatestQuery {
     pub page: Option<u32>,
 }
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/latest",
+
+    tag = "anime",
+
+    operation_id = "anime_latest",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/latest endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn latest(
     State(app_state): State<Arc<AppState>>,

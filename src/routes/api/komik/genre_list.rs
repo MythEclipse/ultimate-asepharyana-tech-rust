@@ -7,24 +7,45 @@ use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json, Router};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
     pub count: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GenresResponse {
     pub status: String,
     pub data: Vec<Genre>,
 }
 
 const CACHE_TTL: u64 = 3600;
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/genre_list",
+
+    tag = "komik",
+
+    operation_id = "komik_genre_list",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/komik/genre_list endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

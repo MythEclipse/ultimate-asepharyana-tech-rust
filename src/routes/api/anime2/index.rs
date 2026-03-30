@@ -5,6 +5,7 @@ use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json, Router};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
@@ -14,13 +15,13 @@ use crate::scraping::anime2 as parsers;
 use crate::scraping::anime::cache as cache_utils;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Anime2Data {
     pub ongoing_anime: Vec<OngoingAnimeItem>,
     pub complete_anime: Vec<CompleteAnimeItem>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Anime2Response {
     pub status: String,
     pub data: Anime2Data,
@@ -28,6 +29,26 @@ pub struct Anime2Response {
 
 const CACHE_KEY: &str = "anime2:index";
 const CACHE_TTL: u64 = 300;
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime2",
+
+    tag = "anime2",
+
+    operation_id = "anime2_index",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime2 endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn anime2(
     State(app_state): State<Arc<AppState>>,

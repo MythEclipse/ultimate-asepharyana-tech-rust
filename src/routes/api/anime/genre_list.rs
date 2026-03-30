@@ -6,24 +6,45 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GenresResponse {
     pub status: String,
     pub data: Vec<Genre>,
 }
 
 const CACHE_TTL: u64 = 3600; // 1 hour - genres don't change often
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/genre_list",
+
+    tag = "anime",
+
+    operation_id = "anime_genre_list",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/genre_list endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn genres(
     State(app_state): State<Arc<AppState>>,

@@ -8,11 +8,12 @@ use axum::extract::State;
 use axum::{response::IntoResponse, Json, Router};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::{info};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct OngoingAnimeItem {
     pub title: String,
     pub slug: String,
@@ -21,7 +22,7 @@ pub struct OngoingAnimeItem {
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct CompleteAnimeItem {
     pub title: String,
     pub slug: String,
@@ -30,7 +31,7 @@ pub struct CompleteAnimeItem {
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeData {
     pub ongoing_anime: Vec<OngoingAnimeItem>,
     pub complete_anime: Vec<CompleteAnimeItem>,
@@ -41,6 +42,26 @@ pub type EmptyResponse = ApiResponse<()>;
 
 use crate::helpers::cache_ttl::CACHE_TTL_VERY_SHORT;
 const CACHE_TTL: u64 = CACHE_TTL_VERY_SHORT; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime",
+
+    tag = "anime",
+
+    operation_id = "anime_index",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn anime(
     State(app_state): State<Arc<AppState>>,

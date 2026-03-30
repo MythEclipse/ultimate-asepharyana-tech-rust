@@ -8,11 +8,12 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::{extract::Path, response::IntoResponse, Json, Router};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeItem {
     pub title: String,
     pub slug: String,
@@ -22,7 +23,7 @@ pub struct AnimeItem {
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -32,7 +33,7 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct GenreAnimeResponse {
     pub status: String,
     pub genre: String,
@@ -40,12 +41,32 @@ pub struct GenreAnimeResponse {
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct GenreQuery {
     pub page: Option<u32>,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/genre/slug",
+
+    tag = "anime",
+
+    operation_id = "anime_genre_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/genre/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,

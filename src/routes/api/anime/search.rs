@@ -14,10 +14,11 @@ use crate::routes::AppState;
 use crate::scraping::urls::get_otakudesu_url;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use tracing::info;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeItem {
     pub title: String,
     pub slug: String,
@@ -29,7 +30,7 @@ pub struct AnimeItem {
     pub rating: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Pagination {
     pub current_page: u32,
     pub last_visible_page: u32,
@@ -39,19 +40,39 @@ pub struct Pagination {
     pub previous_page: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct SearchResponse {
     pub status: String,
     pub data: Vec<AnimeItem>,
     pub pagination: Pagination,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct SearchQuery {
     pub q: Option<String>,
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/search",
+
+    tag = "anime",
+
+    operation_id = "anime_search",
+
+    responses(
+
+        (status = 200, description = "Searches for anime based on query parameters.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn search(
     State(app_state): State<Arc<AppState>>,

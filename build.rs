@@ -18,7 +18,7 @@ use anyhow::{Context, Result};
 use itertools::Itertools;
 
 mod build_utils;
-use build_utils::{auto_mod_generator, mod_generator, BuildOperation};
+use build_utils::{auto_mod_generator, mod_generator, openapi_generator, BuildOperation};
 
 /// Configuration for the build process
 #[derive(Debug)]
@@ -111,6 +111,9 @@ fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result
         println!("cargo:warning=🚀 Using auto-routing system (default)");
         collect_api_data_auto(&api_routes_path)?
     };
+
+    // Generate OpenAPI spec automatically
+    openapi_generator::generate_openapi_spec(&config.project_root, &api_handlers)?;
 
     // Track successful build
     log::info!(

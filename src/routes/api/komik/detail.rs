@@ -19,6 +19,7 @@ use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
@@ -46,14 +47,14 @@ static CHAPTER_TITLE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)(?:chapter|ch\.?)\s*([\d\.]+)").unwrap());
 static CHAPTER_NUMBER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"([\d\.]+)").unwrap());
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Chapter {
     pub chapter: String,
     pub date: String,
     pub chapter_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DetailData {
     pub title: String,
     pub poster: String,
@@ -68,19 +69,19 @@ pub struct DetailData {
     pub chapters: Vec<Chapter>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DetailResponse {
     pub status: bool,
     pub data: DetailData,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct KomikDetailRequest {
     pub komik_id: String,
     pub chapter_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub enum KomikDetailEvent {
     Chapter(Chapter),
     Detail(DetailData),
@@ -88,7 +89,7 @@ pub enum KomikDetailEvent {
     EndOfStream,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct DetailQuery {
     /// The unique identifier for the komik (typically the slug or URL path)
     pub komik_id: Option<String>,
@@ -120,6 +121,26 @@ fn find_table_row_with_text<'a>(
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/komik/detail",
+
+    tag = "komik",
+
+    operation_id = "komik_detail",
+
+    responses(
+
+        (status = 200, description = "Retrieves details for a specific komik by ID.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn detail(
     State(app_state): State<Arc<AppState>>,

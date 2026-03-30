@@ -19,23 +19,24 @@ use axum::{
 };
 use backoff::future::retry;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use tracing::{info, warn};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Genre {
     pub name: String,
     pub slug: String,
     pub anime_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct EpisodeList {
     pub episode: String,
     pub slug: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct Recommendation {
     pub title: String,
     pub slug: String,
@@ -46,7 +47,7 @@ pub struct Recommendation {
     pub r#type: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct AnimeDetailData {
     pub title: String,
     pub alternative_title: String,
@@ -68,7 +69,7 @@ pub struct AnimeDetailData {
     pub recommendations: Vec<Recommendation>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct DetailResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
@@ -76,6 +77,26 @@ pub struct DetailResponse {
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+#[utoipa::path(
+
+    get,
+
+    path = "/api/anime/detail/slug",
+
+    tag = "anime",
+
+    operation_id = "anime_detail_slug",
+
+    responses(
+
+        (status = 200, description = "Handles GET requests for the /api/anime/detail/slug endpoint.", body = serde_json::Value),
+
+        (status = 500, description = "Internal Server Error", body = String)
+
+    )
+
+)]
 
 pub async fn slug(
     State(app_state): State<Arc<AppState>>,
