@@ -42,10 +42,12 @@ impl ScheduledTask for CleanupEmptyRooms {
         let total_rooms = self.room_manager.list_rooms().len();
         let total_users = self.room_manager.total_users();
 
-        info!(
-            "📊 Room stats: {} active rooms, {} total users",
-            total_rooms, total_users
-        );
+        if total_rooms > 0 || total_users > 0 {
+            info!(
+                "📊 Room stats: {} active rooms, {} total users",
+                total_rooms, total_users
+            );
+        }
     }
 }
 

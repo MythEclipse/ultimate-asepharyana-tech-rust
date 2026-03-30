@@ -40,7 +40,7 @@ impl Scheduler {
         let job = Job::new_async(schedule, move |_uuid, _lock| {
             let task = Arc::clone(&task);
             Box::pin(async move {
-                info!("Running scheduled task: {}", task.name());
+                tracing::debug!("Running scheduled task: {}", task.name());
                 task.run().await;
             })
         })?;
@@ -164,10 +164,12 @@ impl ScheduledTask for CleanupExpiredSessions {
         match REDIS_POOL.get().await {
             Ok(mut conn) => {
                 let cleaned = scan_and_clean(&mut conn, "session:*", true).await;
-                info!(
-                    "Session cleanup complete: {} expired sessions found",
-                    cleaned
-                );
+                if cleaned > 0 {
+                    info!(
+                        "Session cleanup complete: {} expired sessions found",
+                        cleaned
+                    );
+                }
             }
             Err(e) => {
                 tracing::error!("Failed to connect to Redis for session cleanup: {}", e);
@@ -201,7 +203,9 @@ impl ScheduledTask for CleanupExpiredTokens {
                 cleaned += scan_and_clean(&mut conn, "jwt_blacklist:*", false).await;
                 cleaned += scan_and_clean(&mut conn, "verify:*", false).await;
 
-                info!("Token cleanup complete: {} expired tokens found", cleaned);
+                if cleaned > 0 {
+                    info!("Token cleanup complete: {} expired tokens found", cleaned);
+                }
             }
             Err(e) => {
                 tracing::error!("Failed to connect to Redis for token cleanup: {}", e);

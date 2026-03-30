@@ -38,14 +38,16 @@ impl ScheduledTask for CleanupOldCache {
     }
 
     async fn run(&self) {
-        info!("🧹 Starting old cache cleanup...");
+        tracing::debug!("🧹 Starting old cache cleanup...");
 
         let mut total_cleaned = 0;
 
         // 1. Clean old image cache (>30 days)
         match self.cleanup_old_images(30).await {
             Ok(count) => {
-                info!("✓ Cleaned {} old image cache entries", count);
+                if count > 0 {
+                    info!("✓ Cleaned {} old image cache entries", count);
+                }
                 total_cleaned += count;
             }
             Err(e) => {
@@ -56,7 +58,9 @@ impl ScheduledTask for CleanupOldCache {
         // 2. Clean orphaned Redis keys
         match self.cleanup_orphaned_redis_keys().await {
             Ok(count) => {
-                info!("✓ Cleaned {} orphaned Redis keys", count);
+                if count > 0 {
+                    info!("✓ Cleaned {} orphaned Redis keys", count);
+                }
                 total_cleaned += count;
             }
             Err(e) => {
@@ -67,14 +71,18 @@ impl ScheduledTask for CleanupOldCache {
         // 3. Compact Redis memory
         match self.compact_redis_memory().await {
             Ok(()) => {
-                info!("✓ Redis memory compacted");
+                if total_cleaned > 0 {
+                    info!("✓ Redis memory compacted");
+                }
             }
             Err(e) => {
                 warn!("Failed to compact Redis memory: {}", e);
             }
         }
 
-        info!("🎉 Cache cleanup complete: {} items cleaned", total_cleaned);
+        if total_cleaned > 0 {
+            info!("🎉 Cache cleanup complete: {} items cleaned", total_cleaned);
+        }
     }
 }
 
