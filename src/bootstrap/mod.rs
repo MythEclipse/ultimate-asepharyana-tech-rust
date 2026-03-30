@@ -90,12 +90,17 @@ impl Application {
             event_bus: event_bus.clone(),
         });
 
+        // Prometheus Metrics
+        let (prometheus_layer, metric_handle) = crate::observability::metrics::setup_metrics();
+
         // Scheduler
         Self::init_scheduler(db_arc.clone()).await?;
 
         // Router
         let app = crate::routes::api::register_routes(Router::new())
+            .route("/metrics", axum::routing::get(move || async move { metric_handle.render() }))
             .with_state(app_state.clone())
+            .layer(prometheus_layer)
             .layer(CompressionLayer::new().quality(CompressionLevel::Fastest))
             .layer(CorsLayer::permissive());
 

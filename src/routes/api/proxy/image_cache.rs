@@ -91,7 +91,8 @@ pub async fn image_cache(
         let semaphore = state.image_processing_semaphore.clone();
 
         tokio::spawn(async move {
-            let cache = ImageCache::new(db, redis).with_semaphore(semaphore);
+            let cache = ImageCache::new(db, redis)
+                .with_semaphore(semaphore);
             match cache.get_or_cache(&url).await {
                 Ok(cdn_url) => {
                     tracing::info!("[LazyCache] Successfully cached: {} -> {}", url, cdn_url)

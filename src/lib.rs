@@ -15,14 +15,13 @@ pub mod infra; // redis, http_client, proxy, image_proxy
 // Features
 // ============================================================================
 pub mod browser; // Browser tab pooling for scraping
-pub mod circuit_breaker; // Circuit breaker for external services
 pub mod events; // Event bus (pub/sub)
 pub mod graceful; // Graceful shutdown with signals
 pub mod health; // Health check endpoints
 pub mod helpers; // Utility helpers (string, datetime, file)
 pub mod jobs; // Background job processing
 pub mod middleware; // logging, request_id, cors, compression middleware
-pub mod observability; // Metrics, request ID, tracing
+pub mod observability; // request ID, tracing
 pub mod scheduler; // Cron jobs
 
 // ============================================================================

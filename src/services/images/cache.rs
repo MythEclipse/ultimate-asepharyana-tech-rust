@@ -137,6 +137,7 @@ pub struct ImageCache {
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
+use metrics::{counter, histogram};
 
 // Global In-Flight Uploads Map
 // Maps Original URL -> Broadcast Sender
@@ -155,7 +156,7 @@ impl ImageCache {
         }
     }
 
-    /// Create with custom configuration
+
     pub fn with_config(
         db: Arc<DatabaseConnection>,
         redis: RedisPool,
@@ -183,8 +184,11 @@ impl ImageCache {
 
         // 1. Check Redis cache first
         let redis_cache = Cache::new(&self.redis);
+        counter!("image_cache_requests_total").increment(1);
+
         if let Some(cached_url) = redis_cache.get::<String>(&cache_key).await {
             info!("ImageCache: Redis hit for {}", original_url);
+            counter!("image_cache_hit_total", "source" => "redis").increment(1);
             return Ok(cached_url);
         }
 
@@ -232,6 +236,7 @@ impl ImageCache {
                     .set_with_ttl(&cache_key, &db_entry.cdn_url, IMAGE_CACHE_TTL)
                     .await;
                 info!("ImageCache: DB hit for {}", original_url);
+                counter!("image_cache_hit_total", "source" => "db").increment(1);
                 return Ok(db_entry.cdn_url);
             }
 
@@ -254,6 +259,8 @@ impl ImageCache {
 
             // 6. Upload
             info!("ImageCache: Miss - uploading {} to Picser", original_url);
+            counter!("image_cache_miss_total").increment(1);
+            let start_time = std::time::Instant::now();
 
             // Acquire permit if semaphore is set
             let redis_clone = self.redis.clone();
@@ -321,6 +328,10 @@ impl ImageCache {
 
                 // Invalidate API caches
                 let _ = self.invalidate_api_caches().await;
+
+                let duration = start_time.elapsed();
+                histogram!("image_upload_duration_seconds").record(duration.as_secs_f64());
+                counter!("image_upload_success_total").increment(1);
 
                 Ok(cdn_url)
             }
@@ -580,6 +591,7 @@ impl ImageCache {
         }
 
         error!("ImageCache: All upload attempts failed for {}", original_url);
+        counter!("image_upload_failure_total").increment(1);
         Err(format!("All upload attempts failed. Last error: {}", last_error))
     }
 

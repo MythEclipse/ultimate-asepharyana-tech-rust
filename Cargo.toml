@@ -65,12 +65,13 @@ chromiumoxide = { version = "0.8.0", default-features = false, features = ["toki
 governor = "0.10.4"
 tokio-cron-scheduler = "0.15.1"
 metrics = "0.24.3"
-metrics-exporter-prometheus = "0.18.1"
+axum-prometheus = "0.10.0"
 hex = "0.4.3"
 hmac = "0.12.1"
 sha2 = "0.10.9"
 log = "0.4"
 walkdir = "2.5"
+metrics-exporter-prometheus = "0.18.1"
 
 
 # Dependensi yang hanya dibutuhkan untuk build script (build.rs)
