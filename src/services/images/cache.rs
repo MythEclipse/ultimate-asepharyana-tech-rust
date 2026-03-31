@@ -506,8 +506,8 @@ impl ImageCache {
             .await
             .map_err(|e| format!("Failed to read Picser response ({}): {}", api_url, e))?;
 
-        // Log the raw response for debugging
-        info!(
+        // Raw responses are noisy at INFO; keep at DEBUG for production clarity.
+        debug!(
             "ImageCache: Picser raw response ({}): {}",
             api_url, response_text
         );
