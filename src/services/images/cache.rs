@@ -486,10 +486,16 @@ impl ImageCache {
         image_bytes: &[u8],
         filename: &str,
     ) -> Result<PicserResponse, String> {
+        info!("ImageCache: Attempting upload to API server: {}", api_url);
+        
         let part = reqwest::multipart::Part::bytes(image_bytes.to_vec())
             .file_name(filename.to_string())
             .mime_str("image/jpeg")
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                let err = format!("Failed to create multipart form for {}: {}", api_url, e);
+                error!("ImageCache: {}", err);
+                err
+            })?;
 
         let form = reqwest::multipart::Form::new().part("file", part);
 
@@ -499,49 +505,74 @@ impl ImageCache {
             .multipart(form)
             .send()
             .await
-            .map_err(|e| format!("Failed to upload to Picser ({}): {}", api_url, e))?;
+            .map_err(|e| {
+                let err = format!("Failed to send request to Picser API ({}): {}", api_url, e);
+                error!("ImageCache: {}", err);
+                err
+            })?;
 
+        let response_status = response.status();
         let response_text = response
             .text()
             .await
-            .map_err(|e| format!("Failed to read Picser response ({}): {}", api_url, e))?;
+            .map_err(|e| {
+                let err = format!("Failed to read Picser response from {} (Status {}): {}", api_url, response_status, e);
+                error!("ImageCache: {}", err);
+                err
+            })?;
 
         // Raw responses are noisy at INFO; keep at DEBUG for production clarity.
         debug!(
-            "ImageCache: Picser raw response ({}): {}",
-            api_url, response_text
+            "ImageCache: Picser raw response from {} (Status {}): {}",
+            api_url, response_status, response_text
         );
 
         let picser_response: PicserResponse =
             serde_json::from_str(&response_text).map_err(|e| {
-                format!(
-                    "Failed to parse Picser response: {} - Raw: {}",
-                    e, response_text
-                )
+                let err = format!(
+                    "Failed to parse Picser response from {}: {} - Raw: {}",
+                    api_url, e, response_text
+                );
+                error!("ImageCache: {}", err);
+                err
             })?;
 
         if !picser_response.success {
             let err_msg = picser_response
                 .error
                 .unwrap_or_else(|| "Unknown error".to_string());
-            return Err(format!("Picser upload failed ({}): {}", api_url, err_msg));
+            let err = format!("Picser upload failed at {} (server error): {}", api_url, err_msg);
+            error!("ImageCache: {}", err);
+            return Err(err);
         }
 
+        info!("ImageCache: Upload successful to API server: {}", api_url);
         Ok(picser_response)
     }
 
     /// Upload image to Picser CDN with failover support
     async fn upload_to_picser(&self, original_url: &str) -> Result<String, String> {
         // Download the image first
+        info!("ImageCache: Starting image download from source: {}", original_url);
         let image_bytes = self
             .client
             .get(original_url)
             .send()
             .await
-            .map_err(|e| format!("Failed to download image: {}", e))?
+            .map_err(|e| {
+                let err = format!("Failed to download image from source ({}): {}", original_url, e);
+                error!("ImageCache: {}", err);
+                err
+            })?
             .bytes()
             .await
-            .map_err(|e| format!("Failed to read image bytes: {}", e))?;
+            .map_err(|e| {
+                let err = format!("Failed to read image bytes from source ({}): {}", original_url, e);
+                error!("ImageCache: {}", err);
+                err
+            })?;
+
+        info!("ImageCache: Image downloaded successfully, size: {} bytes", image_bytes.len());
 
         // Validate that we actually downloaded an image, not an HTML error page or Cloudflare challenge
         let is_valid_image = match infer::get(&image_bytes) {
@@ -558,41 +589,80 @@ impl ImageCache {
         // Determine filename from URL
         let filename = self.extract_filename(original_url);
 
+        info!("ImageCache: Will attempt upload to {} API endpoints sequentially with failover", PICSER_API_ENDPOINTS.len());
+
         use futures::stream::StreamExt;
         let mut tasks = futures::stream::FuturesUnordered::new();
 
-        for api_url in PICSER_API_ENDPOINTS {
-            let image_bytes_ref = &image_bytes;
-            let filename_ref = &filename;
+        for (attempt_num, api_url) in PICSER_API_ENDPOINTS.iter().enumerate() {
+            let api_url = api_url.to_string();
+            let image_bytes_clone = image_bytes.clone();
+            let filename_clone = filename.clone();
+            let original_url_clone = original_url.to_string();
             
             tasks.push(async move {
-                debug!("ImageCache: Attempting upload to: {}", api_url);
+                let attempt_number = attempt_num + 1;
+                info!(
+                    "ImageCache: [Attempt {}/{}] Uploading {} bytes to: {}",
+                    attempt_number,
+                    PICSER_API_ENDPOINTS.len(),
+                    image_bytes_clone.len(),
+                    api_url
+                );
+                
                 match tokio::time::timeout(
                     std::time::Duration::from_secs(5),
-                    self.perform_single_upload(api_url, image_bytes_ref, filename_ref)
+                    self.perform_single_upload(&api_url, &image_bytes_clone, &filename_clone)
                 ).await {
-                    Ok(Ok(response)) => self.extract_cdn_url(response, original_url),
-                    Ok(Err(e)) => Err(e),
-                    Err(_) => Err(format!("Timeout (5s) for {}", api_url)),
+                    Ok(Ok(response)) => {
+                        info!("ImageCache: [Attempt {}/{}] Upload successful to {}", attempt_number, PICSER_API_ENDPOINTS.len(), api_url);
+                        self.extract_cdn_url(response, &original_url_clone)
+                    },
+                    Ok(Err(e)) => {
+                        warn!("ImageCache: [Attempt {}/{}] Upload to {} failed: {}", attempt_number, PICSER_API_ENDPOINTS.len(), api_url, e);
+                        Err(e)
+                    },
+                    Err(_) => {
+                        let err = format!("Timeout (5s) while uploading to API endpoint: {}", api_url);
+                        warn!("ImageCache: [Attempt {}/{}] {}", attempt_number, PICSER_API_ENDPOINTS.len(), err);
+                        Err(err)
+                    },
                 }
             });
         }
 
-        let mut last_error = String::from("No endpoints available");
+        let mut last_failed_api = String::from("Unknown");
+        let mut attempt_count = 0;
 
         while let Some(result) = tasks.next().await {
+            attempt_count += 1;
             match result {
-                Ok(cdn_url) => return Ok(cdn_url),
+                Ok(cdn_url) => {
+                    info!("ImageCache: Upload succeeded on attempt {}/{} - CDN URL: {}", 
+                          attempt_count, PICSER_API_ENDPOINTS.len(), cdn_url);
+                    return Ok(cdn_url);
+                },
                 Err(e) => {
-                    warn!("ImageCache: Upload attempt failed: {}", e);
-                    last_error = e;
+                    // Extract API URL from error message if possible
+                    if e.contains("API endpoint:") {
+                        if let Some(start) = e.find("API endpoint:") {
+                            last_failed_api = e[start + 13..].trim().to_string();
+                        }
+                    }
+                    error!("ImageCache: Attempt {}/{} failed - Last failed API: {} - Error: {}", 
+                           attempt_count, PICSER_API_ENDPOINTS.len(), last_failed_api, e);
                 }
             }
         }
 
-        error!("ImageCache: All upload attempts failed for {}", original_url);
+        error!("ImageCache: All {} API upload attempts failed for source URL: {}", 
+               PICSER_API_ENDPOINTS.len(), original_url);
         counter!("image_upload_failure_total").increment(1);
-        Err(format!("All upload attempts failed. Last error: {}", last_error))
+        Err(format!(
+            "All {} API upload attempts failed. Last failed API endpoint: {}",
+            PICSER_API_ENDPOINTS.len(),
+            last_failed_api
+        ))
     }
 
     /// Internally verify a CDN URL's accessibility and validity
@@ -602,22 +672,45 @@ impl ImageCache {
             .get(cdn_url)
             .send()
             .await
-            .map_err(|e| format!("Network error: {}", e))?;
+            .map_err(|e| {
+                let err = format!("Network error verifying CDN URL ({}): {}", cdn_url, e);
+                warn!("ImageCache: {}", err);
+                err
+            })?;
 
-        if !resp.status().is_success() {
+        let status = resp.status();
+        if !status.is_success() {
+            let err = format!(
+                "CDN verification failed with HTTP {} for URL: {}",
+                status, cdn_url
+            );
+            warn!("ImageCache: {}", err);
             return Ok(false);
         }
 
         let bytes = resp
             .bytes()
             .await
-            .map_err(|e| format!("Failed to read bytes: {}", e))?;
+            .map_err(|e| {
+                let err = format!("Failed to read bytes from CDN URL ({}): {}", cdn_url, e);
+                warn!("ImageCache: {}", err);
+                err
+            })?;
 
         // Structural verification (Fast MIME check)
-        if infer::get(&bytes).map(|k| k.mime_type().starts_with("image/")).unwrap_or(false) {
+        let is_valid = infer::get(&bytes)
+            .map(|k| k.mime_type().starts_with("image/"))
+            .unwrap_or(false);
+
+        if is_valid {
+            debug!("ImageCache: CDN URL verified successfully - content is valid image: {}", cdn_url);
             Ok(true)
         } else {
-            warn!("ImageCache: CDN URL {} returned invalid content during verification", cdn_url);
+            warn!(
+                "ImageCache: CDN URL verification failed - content is not a valid image ({}): {}",
+                cdn_url,
+                String::from_utf8_lossy(&bytes[0..std::cmp::min(100, bytes.len())])
+            );
             Ok(false)
         }
     }
@@ -628,19 +721,50 @@ impl ImageCache {
         response: PicserResponse,
         original_url: &str,
     ) -> Result<String, String> {
-        response
-            .urls
-            .as_ref()
-            .and_then(|u| u.jsdelivr_commit.clone().or(u.jsdelivr.clone()))
-            .or(response.url.clone())
-            .or(response.github_url.clone())
-            .ok_or_else(|| {
-                error!(
-                    "ImageCache: No CDN URL in Picser response for {}",
-                    original_url
-                );
-                "No CDN URL in Picser response".to_string()
-            })
+        // Try to extract CDN URL from various response fields
+        if let Some(urls) = &response.urls {
+            if let Some(url) = &urls.jsdelivr_commit {
+                info!("ImageCache: Using CDN URL from urls.jsdelivr_commit for source: {}", original_url);
+                return Ok(url.clone());
+            }
+            if let Some(url) = &urls.jsdelivr {
+                info!("ImageCache: Using CDN URL from urls.jsdelivr for source: {}", original_url);
+                return Ok(url.clone());
+            }
+            if let Some(url) = &urls.raw {
+                info!("ImageCache: Using CDN URL from urls.raw for source: {}", original_url);
+                return Ok(url.clone());
+            }
+            if let Some(url) = &urls.github {
+                info!("ImageCache: Using CDN URL from urls.github for source: {}", original_url);
+                return Ok(url.clone());
+            }
+        }
+
+        if let Some(url) = &response.url {
+            info!("ImageCache: Using CDN URL from response.url for source: {}", original_url);
+            return Ok(url.clone());
+        }
+
+        if let Some(url) = &response.github_url {
+            info!("ImageCache: Using CDN URL from response.github_url for source: {}", original_url);
+            return Ok(url.clone());
+        }
+
+        // If we get here, no CDN URL was found in the response
+        error!(
+            "ImageCache: No CDN URL found in Picser API response for source URL: {}. Response fields - success: {}, has_urls: {}, has_url: {}, has_github_url: {}, error: {}",
+            original_url,
+            response.success,
+            response.urls.is_some(),
+            response.url.is_some(),
+            response.github_url.is_some(),
+            response.error.as_deref().unwrap_or("none")
+        );
+        Err(format!(
+            "No CDN URL in Picser response. Checked: urls.{{jsdelivr_commit,jsdelivr,raw,github}}, url, github_url. Response error: {}",
+            response.error.unwrap_or_else(|| "none".to_string())
+        ))
     }
 
     /// Extract filename from URL
