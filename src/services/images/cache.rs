@@ -521,9 +521,9 @@ impl ImageCache {
                 err
             })?;
 
-        // Raw responses are noisy at INFO; keep at DEBUG for production clarity.
-        debug!(
-            "ImageCache: Picser raw response from {} (Status {}): {}",
+        // Raw responses - log at INFO level to show what each endpoint actually returns
+        info!(
+            "ImageCache: Raw response from {} (Status {}): {}",
             api_url, response_status, response_text
         );
 
