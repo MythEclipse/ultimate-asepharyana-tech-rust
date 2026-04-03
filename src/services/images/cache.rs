@@ -10,7 +10,7 @@ use reqwest::Client;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::infra::http_client::http_client;
 
@@ -188,7 +188,7 @@ impl ImageCache {
         counter!("image_cache_requests_total").increment(1);
 
         if let Some(cached_url) = redis_cache.get::<String>(&cache_key).await {
-            info!("ImageCache: Redis hit for {}", original_url);
+            debug!("ImageCache: Redis hit for {}", original_url);
             counter!("image_cache_hit_total", "source" => "redis").increment(1);
             return Ok(cached_url);
         }
@@ -199,13 +199,13 @@ impl ImageCache {
             use dashmap::mapref::entry::Entry;
             match IN_FLIGHT_UPLOADS.entry(original_url.to_string()) {
                 Entry::Occupied(entry) => {
-                    info!("ImageCache: Joining in-flight upload for {}", original_url);
+                    debug!("ImageCache: Joining in-flight upload for {}", original_url);
                     (entry.get().clone(), false)
                 }
                 Entry::Vacant(entry) => {
                     let (tx, _) = broadcast::channel(1);
                     entry.insert(tx.clone());
-                    info!("ImageCache: Starting leader upload for {}", original_url);
+                    debug!("ImageCache: Starting leader upload for {}", original_url);
                     (tx, true)
                 }
             }
@@ -236,7 +236,7 @@ impl ImageCache {
                 let _ = redis_cache
                     .set_with_ttl(&cache_key, &db_entry.cdn_url, IMAGE_CACHE_TTL)
                     .await;
-                info!("ImageCache: DB hit for {}", original_url);
+                debug!("ImageCache: DB hit for {}", original_url);
                 counter!("image_cache_hit_total", "source" => "db").increment(1);
                 return Ok(db_entry.cdn_url);
             }
@@ -246,7 +246,7 @@ impl ImageCache {
                 // Even if locked by another process, strict single-flight within this instance
                 // is good. But if another process is working, we might want to wait or just return error?
                 // Current logic returns error.
-                info!(
+                debug!(
                     "ImageCache: Already being cached by another process: {}",
                     original_url
                 );
@@ -259,7 +259,7 @@ impl ImageCache {
                 .await;
 
             // 6. Upload
-            info!("ImageCache: Miss - uploading {} to Picser", original_url);
+            debug!("ImageCache: Miss - uploading {} to Picser", original_url);
             counter!("image_cache_miss_total").increment(1);
             let start_time = std::time::Instant::now();
 
@@ -296,7 +296,7 @@ impl ImageCache {
                     match self.verify_cdn_url(&cdn_url).await {
                         Ok(true) => {
                             is_valid = true;
-                            info!("ImageCache: CDN URL verified successfully for {}", original_url);
+                            debug!("ImageCache: CDN URL verified successfully for {}", original_url);
                             break;
                         }
                         Ok(false) => {
@@ -402,7 +402,7 @@ impl ImageCache {
             .await
             .map_err(|e| e.to_string())?;
 
-        info!("ImageCache: Invalidated {}", original_url);
+        debug!("ImageCache: Invalidated {}", original_url);
         Ok(())
     }
 
@@ -471,7 +471,7 @@ impl ImageCache {
         }
 
         if total_deleted > 0 {
-            info!(
+            debug!(
                 "ImageCache: Invalidated {} API cache keys after image upload",
                 total_deleted
             );
@@ -487,7 +487,7 @@ impl ImageCache {
         image_bytes: &[u8],
         filename: &str,
     ) -> Result<PicserResponse, String> {
-        info!("ImageCache: Attempting upload to API server: {}", api_url);
+        debug!("ImageCache: Attempting upload to API server: {}", api_url);
         
         let part = reqwest::multipart::Part::bytes(image_bytes.to_vec())
             .file_name(filename.to_string())
@@ -525,8 +525,8 @@ impl ImageCache {
                 err
             })?;
 
-        // Raw responses - log at INFO level to show what each endpoint actually returns
-        info!(
+        // Raw responses stay at debug level for troubleshooting without noisy default logs
+        debug!(
             "ImageCache: Raw response from {} (Status {}): {}",
             api_url, response_status, response_text
         );
@@ -575,14 +575,14 @@ impl ImageCache {
             return Err(err);
         }
 
-        info!("ImageCache: Upload successful to API server: {}", api_url);
+        debug!("ImageCache: Upload successful to API server: {}", api_url);
         Ok(picser_response)
     }
 
     /// Upload image to Picser CDN with failover support
     async fn upload_to_picser(&self, original_url: &str) -> Result<String, String> {
         // Download the image first
-        info!("ImageCache: Starting image download from source: {}", original_url);
+        debug!("ImageCache: Starting image download from source: {}", original_url);
         let image_bytes = self
             .client
             .get(original_url)
@@ -601,7 +601,7 @@ impl ImageCache {
                 err
             })?;
 
-        info!("ImageCache: Image downloaded successfully, size: {} bytes", image_bytes.len());
+        debug!("ImageCache: Image downloaded successfully, size: {} bytes", image_bytes.len());
 
         // Validate that we actually downloaded an image, not an HTML error page or Cloudflare challenge
         let is_valid_image = match infer::get(&image_bytes) {
@@ -618,13 +618,13 @@ impl ImageCache {
         // Determine filename from URL
         let filename = self.extract_filename(original_url);
 
-        info!("ImageCache: Will attempt upload to {} API endpoints sequentially with failover", PICSER_API_ENDPOINTS.len());
+        debug!("ImageCache: Will attempt upload to {} API endpoints sequentially with failover", PICSER_API_ENDPOINTS.len());
 
         let mut last_failed_api = String::from("Unknown");
 
         for (attempt_num, api_url) in PICSER_API_ENDPOINTS.iter().enumerate() {
             let attempt_number = attempt_num + 1;
-            info!(
+            debug!(
                 "ImageCache: [Attempt {}/{}] Uploading {} bytes to: {}",
                 attempt_number,
                 PICSER_API_ENDPOINTS.len(),
@@ -641,7 +641,7 @@ impl ImageCache {
                 Ok(Ok(response)) => {
                     match self.extract_cdn_url(response, original_url) {
                         Ok(cdn_url) => {
-                            info!(
+                            debug!(
                                 "ImageCache: Upload succeeded on attempt {}/{} - CDN URL: {}",
                                 attempt_number,
                                 PICSER_API_ENDPOINTS.len(),
@@ -774,30 +774,30 @@ impl ImageCache {
         // Try to extract CDN URL from various response fields
         if let Some(urls) = &response.urls {
             if let Some(url) = &urls.jsdelivr_commit {
-                info!("ImageCache: Using CDN URL from urls.jsdelivr_commit for source: {}", original_url);
+                debug!("ImageCache: Using CDN URL from urls.jsdelivr_commit for source: {}", original_url);
                 return Ok(url.clone());
             }
             if let Some(url) = &urls.jsdelivr {
-                info!("ImageCache: Using CDN URL from urls.jsdelivr for source: {}", original_url);
+                debug!("ImageCache: Using CDN URL from urls.jsdelivr for source: {}", original_url);
                 return Ok(url.clone());
             }
             if let Some(url) = &urls.raw {
-                info!("ImageCache: Using CDN URL from urls.raw for source: {}", original_url);
+                debug!("ImageCache: Using CDN URL from urls.raw for source: {}", original_url);
                 return Ok(url.clone());
             }
             if let Some(url) = &urls.github {
-                info!("ImageCache: Using CDN URL from urls.github for source: {}", original_url);
+                debug!("ImageCache: Using CDN URL from urls.github for source: {}", original_url);
                 return Ok(url.clone());
             }
         }
 
         if let Some(url) = &response.url {
-            info!("ImageCache: Using CDN URL from response.url for source: {}", original_url);
+            debug!("ImageCache: Using CDN URL from response.url for source: {}", original_url);
             return Ok(url.clone());
         }
 
         if let Some(url) = &response.github_url {
-            info!("ImageCache: Using CDN URL from response.github_url for source: {}", original_url);
+            debug!("ImageCache: Using CDN URL from response.github_url for source: {}", original_url);
             return Ok(url.clone());
         }
 

@@ -23,13 +23,15 @@ pub struct Application {
 
 impl Application {
     pub async fn build() -> anyhow::Result<Self> {
-        // Initialize tracing
-        let filter = &CONFIG.log_level;
-        if std::env::var("RUST_LOG").is_err() {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::new(filter))
-                .init();
-        }
+        // Initialize tracing. Default to warn/error globally unless RUST_LOG is explicitly set.
+        let env_filter = match std::env::var("RUST_LOG") {
+            Ok(filter) => EnvFilter::new(filter),
+            Err(_) => EnvFilter::new("warn"),
+        };
+
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .init();
 
         tracing::info!("🚀 RustExpress starting up...");
         tracing::info!("   Environment: {}", CONFIG.environment);
