@@ -34,8 +34,8 @@ pub const IMAGE_CACHE_LOCK_TTL: u64 = 60;
 pub const PICSER_API_ENDPOINTS: &[&str] = &[
     "https://picser.asepharyana.tech/api/upload",
     "https://picser-two.vercel.app/api/upload",
-    "https://picser-mytheclipse8647-ahoqi9ef.leapcell.dev/api/upload",
     "https://picser.pages.dev/api/upload",
+    "https://picser-mytheclipse8647-ahoqi9ef.leapcell.dev/api/upload",
 ];
 
 /// Create a hash of the URL for cache key
@@ -611,7 +611,7 @@ impl ImageCache {
                 );
                 
                 match tokio::time::timeout(
-                    std::time::Duration::from_secs(5),
+                    std::time::Duration::from_secs(30),
                     self.perform_single_upload(&api_url, &image_bytes_clone, &filename_clone)
                 ).await {
                     Ok(Ok(response)) => {
@@ -623,7 +623,7 @@ impl ImageCache {
                         Err(e)
                     },
                     Err(_) => {
-                        let err = format!("Timeout (5s) while uploading to API endpoint: {}", api_url);
+                        let err = format!("Timeout (30s) while uploading to API endpoint: {}", api_url);
                         warn!("ImageCache: [Attempt {}/{}] {}", attempt_number, PICSER_API_ENDPOINTS.len(), err);
                         Err(err)
                     },
