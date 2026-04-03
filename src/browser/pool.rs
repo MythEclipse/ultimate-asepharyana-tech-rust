@@ -7,8 +7,37 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{Mutex, Semaphore};
+use reqwest::StatusCode;
 use tracing::{debug, info, warn};
 use serde_json::json;
+
+fn build_http_endpoint(remote_url: &str, path: &str) -> anyhow::Result<String> {
+    let mut url = reqwest::Url::parse(remote_url)
+        .map_err(|e| anyhow::anyhow!("Invalid remote browser URL '{}': {}", remote_url, e))?;
+
+    match url.scheme() {
+        "ws" => {
+            url.set_scheme("http")
+                .map_err(|_| anyhow::anyhow!("Failed to convert scheme from ws to http"))?;
+        }
+        "wss" => {
+            url.set_scheme("https")
+                .map_err(|_| anyhow::anyhow!("Failed to convert scheme from wss to https"))?;
+        }
+        "http" | "https" => {}
+        scheme => {
+            return Err(anyhow::anyhow!(
+                "Unsupported browser URL scheme '{}'. Expected ws:// or wss://",
+                scheme
+            ));
+        }
+    }
+
+    let normalized = path.trim_start_matches('/');
+    url.set_path(normalized);
+
+    Ok(url.to_string())
+}
 
 /// Configuration for the browser pool.
 #[derive(Debug, Clone)]
@@ -108,32 +137,52 @@ impl BrowserPool {
     async fn verify_remote_connection(config: &BrowserPoolConfig) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
 
-        // Try a simple health check endpoint
-        let response = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            client
-                .get(format!("{}/health", config.remote_websocket_url))
-                .send(),
-        )
-        .await;
+        // Browserless/CDP deployments vary by exposed endpoint.
+        // Try multiple known paths and succeed on any valid HTTP response from the host.
+        let check_paths = ["json/version", "health", ""];
+        let mut last_non_success: Option<(String, StatusCode)> = None;
 
-        match response {
-            Ok(Ok(r)) if r.status().is_success() => {
-                info!("Remote browser health check passed");
-                Ok(())
-            }
-            Ok(Ok(r)) => {
-                warn!("Remote browser health check returned: {}", r.status());
-                // Don't fail hard - might work despite health check
-                Ok(())
-            }
-            Ok(Err(e)) => {
-                Err(anyhow::anyhow!("Failed to connect to remote browser: {}", e))
-            }
-            Err(_) => {
-                Err(anyhow::anyhow!("Remote browser connection timeout"))
+        for path in check_paths {
+            let endpoint = build_http_endpoint(&config.remote_websocket_url, path)?;
+            let response = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                client.get(&endpoint).send(),
+            )
+            .await;
+
+            match response {
+                Ok(Ok(r)) if r.status().is_success() => {
+                    info!("Remote browser health check passed via {}", endpoint);
+                    return Ok(());
+                }
+                Ok(Ok(r)) if r.status() == StatusCode::UNAUTHORIZED || r.status() == StatusCode::FORBIDDEN => {
+                    return Err(anyhow::anyhow!(
+                        "Remote browser reachable but authentication failed at {}: {}",
+                        endpoint,
+                        r.status()
+                    ));
+                }
+                Ok(Ok(r)) => {
+                    last_non_success = Some((endpoint, r.status()));
+                }
+                Ok(Err(e)) => {
+                    return Err(anyhow::anyhow!("Failed to connect to remote browser: {}", e));
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!("Remote browser connection timeout"));
+                }
             }
         }
+
+        if let Some((endpoint, status)) = last_non_success {
+            warn!(
+                "Remote browser reachable but no known health endpoint succeeded (last: {} -> {})",
+                endpoint,
+                status
+            );
+        }
+
+        Ok(())
     }
 
     /// Get a tab from the pool.
@@ -196,11 +245,12 @@ impl PooledTab {
     pub async fn goto(&self, url: &str) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "goto")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/goto", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "url": url }))
                 .send(),
         )
@@ -223,10 +273,11 @@ impl PooledTab {
     pub async fn content(&self) -> anyhow::Result<String> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "content")?;
 
         let response = tokio::time::timeout(
             timeout,
-            client.post(format!("{}/content", self.cdp_url)).send(),
+            client.post(&endpoint).send(),
         )
         .await
         .map_err(|_| anyhow::anyhow!("Timeout getting page content"))?
@@ -245,11 +296,12 @@ impl PooledTab {
     ) -> anyhow::Result<T> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "evaluate")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/evaluate", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "expression": expression }))
                 .send(),
         )
@@ -269,11 +321,12 @@ impl PooledTab {
     pub async fn wait_for_selector(&self, selector: &str) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "waitForSelector")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/waitForSelector", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "selector": selector }))
                 .send(),
         )
@@ -296,11 +349,12 @@ impl PooledTab {
     pub async fn click(&self, selector: &str) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "click")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/click", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "selector": selector }))
                 .send(),
         )
@@ -323,11 +377,12 @@ impl PooledTab {
     pub async fn type_text(&self, selector: &str, text: &str) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "type")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/type", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "selector": selector, "text": text }))
                 .send(),
         )
@@ -350,11 +405,12 @@ impl PooledTab {
     pub async fn screenshot(&self) -> anyhow::Result<Vec<u8>> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(15);
+        let endpoint = build_http_endpoint(&self.cdp_url, "screenshot")?;
 
         let response = tokio::time::timeout(
             timeout,
             client
-                .post(format!("{}/screenshot", self.cdp_url))
+                .post(&endpoint)
                 .json(&json!({ "fullPage": true }))
                 .send(),
         )
@@ -373,10 +429,11 @@ impl PooledTab {
     pub async fn url(&self) -> anyhow::Result<String> {
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_secs(10);
+        let endpoint = build_http_endpoint(&self.cdp_url, "url")?;
 
         let response = tokio::time::timeout(
             timeout,
-            client.post(format!("{}/url", self.cdp_url)).send(),
+            client.post(&endpoint).send(),
         )
         .await
         .map_err(|_| anyhow::anyhow!("Timeout getting URL"))?
