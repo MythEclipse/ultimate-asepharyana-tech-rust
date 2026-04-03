@@ -32,9 +32,9 @@ pub const IMAGE_CACHE_LOCK_TTL: u64 = 60;
 
 /// Picser API endpoints in priority order
 pub const PICSER_API_ENDPOINTS: &[&str] = &[
+    "https://picser-two.vercel.app/api/upload",
     "https://picser.asepharyana.tech/api/upload",
     "https://picser-mytheclipse8647-ahoqi9ef.leapcell.dev/api/upload",
-    "https://picser-two.vercel.app/api/upload",
     "https://picser.pages.dev/api/upload",
 ];
 
@@ -77,6 +77,7 @@ pub fn to_wp_cdn(url: &str) -> String {
 /// Response from Picser API (/api/upload)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PicserResponse {
+    #[serde(default)]
     pub success: bool,
     pub url: Option<String>,
     pub urls: Option<PicserUrls>,
