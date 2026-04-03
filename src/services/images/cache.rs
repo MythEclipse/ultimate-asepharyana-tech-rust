@@ -32,10 +32,10 @@ pub const IMAGE_CACHE_LOCK_TTL: u64 = 60;
 
 /// Picser API endpoints in priority order
 pub const PICSER_API_ENDPOINTS: &[&str] = &[
-    "https://picser.pages.dev/api/upload",
+    "https://picser.asepharyana.tech/api/upload",
     "https://picser-mytheclipse8647-ahoqi9ef.leapcell.dev/api/upload",
     "https://picser-two.vercel.app/api/upload",
-    "https://picser.asepharyana.tech/api/upload",
+    "https://picser.pages.dev/api/upload",
 ];
 
 /// Create a hash of the URL for cache key
@@ -516,7 +516,10 @@ impl ImageCache {
             .text()
             .await
             .map_err(|e| {
-                let err = format!("Failed to read Picser response from {} (Status {}): {}", api_url, response_status, e);
+                let err = format!(
+                    "Failed to read Picser response from {} (Status {}): {}",
+                    api_url, response_status, e
+                );
                 error!("ImageCache: {}", err);
                 err
             })?;
@@ -526,6 +529,31 @@ impl ImageCache {
             "ImageCache: Raw response from {} (Status {}): {}",
             api_url, response_status, response_text
         );
+
+        if !response_status.is_success() {
+            let error_message = serde_json::from_str::<serde_json::Value>(&response_text)
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("error")
+                        .and_then(|error| error.as_str())
+                        .map(|error| error.to_string())
+                        .or_else(|| {
+                            value
+                                .get("message")
+                                .and_then(|message| message.as_str())
+                                .map(|message| message.to_string())
+                        })
+                })
+                .unwrap_or_else(|| response_text.clone());
+
+            let err = format!(
+                "Picser upload failed at {} (HTTP {}): {}",
+                api_url, response_status, error_message
+            );
+            error!("ImageCache: {}", err);
+            return Err(err);
+        }
 
         let picser_response: PicserResponse =
             serde_json::from_str(&response_text).map_err(|e| {
@@ -591,66 +619,87 @@ impl ImageCache {
 
         info!("ImageCache: Will attempt upload to {} API endpoints sequentially with failover", PICSER_API_ENDPOINTS.len());
 
-        use futures::stream::StreamExt;
-        let mut tasks = futures::stream::FuturesUnordered::new();
+        let mut last_failed_api = String::from("Unknown");
 
         for (attempt_num, api_url) in PICSER_API_ENDPOINTS.iter().enumerate() {
-            let api_url = api_url.to_string();
-            let image_bytes_clone = image_bytes.clone();
-            let filename_clone = filename.clone();
-            let original_url_clone = original_url.to_string();
-            
-            tasks.push(async move {
-                let attempt_number = attempt_num + 1;
-                info!(
-                    "ImageCache: [Attempt {}/{}] Uploading {} bytes to: {}",
-                    attempt_number,
-                    PICSER_API_ENDPOINTS.len(),
-                    image_bytes_clone.len(),
-                    api_url
-                );
-                
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(30),
-                    self.perform_single_upload(&api_url, &image_bytes_clone, &filename_clone)
-                ).await {
-                    Ok(Ok(response)) => {
-                        info!("ImageCache: [Attempt {}/{}] Upload successful to {}", attempt_number, PICSER_API_ENDPOINTS.len(), api_url);
-                        self.extract_cdn_url(response, &original_url_clone)
-                    },
-                    Ok(Err(e)) => {
-                        warn!("ImageCache: [Attempt {}/{}] Upload to {} failed: {}", attempt_number, PICSER_API_ENDPOINTS.len(), api_url, e);
-                        Err(e)
-                    },
-                    Err(_) => {
-                        let err = format!("Timeout (30s) while uploading to API endpoint: {}", api_url);
-                        warn!("ImageCache: [Attempt {}/{}] {}", attempt_number, PICSER_API_ENDPOINTS.len(), err);
-                        Err(err)
-                    },
-                }
-            });
-        }
+            let attempt_number = attempt_num + 1;
+            info!(
+                "ImageCache: [Attempt {}/{}] Uploading {} bytes to: {}",
+                attempt_number,
+                PICSER_API_ENDPOINTS.len(),
+                image_bytes.len(),
+                api_url
+            );
 
-        let mut last_failed_api = String::from("Unknown");
-        let mut attempt_count = 0;
-
-        while let Some(result) = tasks.next().await {
-            attempt_count += 1;
-            match result {
-                Ok(cdn_url) => {
-                    info!("ImageCache: Upload succeeded on attempt {}/{} - CDN URL: {}", 
-                          attempt_count, PICSER_API_ENDPOINTS.len(), cdn_url);
-                    return Ok(cdn_url);
-                },
-                Err(e) => {
-                    // Extract API URL from error message if possible
-                    if e.contains("API endpoint:") {
-                        if let Some(start) = e.find("API endpoint:") {
-                            last_failed_api = e[start + 13..].trim().to_string();
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(30),
+                self.perform_single_upload(api_url, &image_bytes, &filename),
+            )
+            .await
+            {
+                Ok(Ok(response)) => {
+                    match self.extract_cdn_url(response, original_url) {
+                        Ok(cdn_url) => {
+                            info!(
+                                "ImageCache: Upload succeeded on attempt {}/{} - CDN URL: {}",
+                                attempt_number,
+                                PICSER_API_ENDPOINTS.len(),
+                                cdn_url
+                            );
+                            return Ok(cdn_url);
+                        }
+                        Err(e) => {
+                            last_failed_api = api_url.to_string();
+                            warn!(
+                                "ImageCache: [Attempt {}/{}] Upload from {} did not yield a CDN URL: {}",
+                                attempt_number,
+                                PICSER_API_ENDPOINTS.len(),
+                                api_url,
+                                e
+                            );
+                            error!(
+                                "ImageCache: Attempt {}/{} failed - Last failed API: {} - Error: {}",
+                                attempt_number,
+                                PICSER_API_ENDPOINTS.len(),
+                                last_failed_api,
+                                e
+                            );
                         }
                     }
-                    error!("ImageCache: Attempt {}/{} failed - Last failed API: {} - Error: {}", 
-                           attempt_count, PICSER_API_ENDPOINTS.len(), last_failed_api, e);
+                }
+                Ok(Err(e)) => {
+                    last_failed_api = api_url.to_string();
+                    warn!(
+                        "ImageCache: [Attempt {}/{}] Upload to {} failed: {}",
+                        attempt_number,
+                        PICSER_API_ENDPOINTS.len(),
+                        api_url,
+                        e
+                    );
+                    error!(
+                        "ImageCache: Attempt {}/{} failed - Last failed API: {} - Error: {}",
+                        attempt_number,
+                        PICSER_API_ENDPOINTS.len(),
+                        last_failed_api,
+                        e
+                    );
+                }
+                Err(_) => {
+                    last_failed_api = api_url.to_string();
+                    let err = format!("Timeout (30s) while uploading to API endpoint: {}", api_url);
+                    warn!(
+                        "ImageCache: [Attempt {}/{}] {}",
+                        attempt_number,
+                        PICSER_API_ENDPOINTS.len(),
+                        err
+                    );
+                    error!(
+                        "ImageCache: Attempt {}/{} failed - Last failed API: {} - Error: {}",
+                        attempt_number,
+                        PICSER_API_ENDPOINTS.len(),
+                        last_failed_api,
+                        err
+                    );
                 }
             }
         }
