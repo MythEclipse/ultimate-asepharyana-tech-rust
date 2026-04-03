@@ -1,36 +1,24 @@
-//! Browser pool for managing a single browser with multiple tabs.
+//! Browser pool for managing a single remote browser with multiple tabs.
 //!
-//! This pool maintains one headless Chrome instance and provides tabs
-//! on-demand for scraping. Tabs are returned to the pool after use.
+//! This pool maintains a connection to a remote Chrome DevTools Protocol (CDP)
+//! endpoint and provides tabs on-demand for scraping. Tabs are returned to the
+//! pool after use. Requires EXTERNAL_BROWSERLESS_WS or CHROME_REMOTE_WS to be set.
 
-use crate::helpers::uuid_v4;
-use chromiumoxide::{Browser, BrowserConfig, Page};
-use futures::StreamExt;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{Mutex, Semaphore};
 use tracing::{debug, info, warn};
+use serde_json::json;
 
 /// Configuration for the browser pool.
 #[derive(Debug, Clone)]
 pub struct BrowserPoolConfig {
-    /// Remote Chrome DevTools Protocol WebSocket URL.
-    /// When set (e.g. `ws://browserless:3000`), the pool connects to an external
-    /// Chrome instance instead of spawning one locally. Takes precedence over
-    /// `chrome_path`. Controlled via the `CHROME_REMOTE_WS` environment variable.
-    pub remote_websocket_url: Option<String>,
+    /// Remote Chrome DevTools Protocol WebSocket URL (required).
+    /// Must be set via `EXTERNAL_BROWSERLESS_WS` or `CHROME_REMOTE_WS` environment variable.
+    /// Takes precedence from: EXTERNAL_BROWSERLESS_WS → CHROME_REMOTE_WS → None
+    pub remote_websocket_url: String,
     /// Maximum number of concurrent tabs
     pub max_tabs: usize,
-    /// Chrome/Chromium executable path (None = auto-detect). Only used when
-    /// `remote_websocket_url` is `None`.
-    pub chrome_path: Option<String>,
-    /// Whether to run headless
-    pub headless: bool,
-    /// Enable sandbox (disable for Docker)
-    pub sandbox: bool,
-    /// User agent string
-    pub user_agent: Option<String>,
-    /// Window dimensions
-    pub window_size: Option<(u32, u32)>,
 }
 
 impl Default for BrowserPoolConfig {
@@ -39,82 +27,38 @@ impl Default for BrowserPoolConfig {
         //   1. EXTERNAL_BROWSERLESS_WS  — explicit operator override, always wins
         //   2. CHROME_REMOTE_WS         — may be injected by Coolify/Docker networking;
         //      rejected when it resolves to the unroutable Docker alias
-        //      "ws://browserless:3000" (name-resolution will fail outside Docker overlay)
-        //   3. <None>                   — fall through to local Chrome launch
-
         let external = std::env::var("EXTERNAL_BROWSERLESS_WS").ok();
         let chrome_remote = std::env::var("CHROME_REMOTE_WS").ok();
 
-        let remote_websocket_url: Option<String> = if let Some(ext) = external {
-            // EXTERNAL_BROWSERLESS_WS is unconditionally the highest-priority source.
-            tracing::info!(
-                "🌐 Browser: using EXTERNAL_BROWSERLESS_WS ({})",
-                ext
-            );
-            Some(ext)
+        let remote_websocket_url = if let Some(ext) = external {
+            tracing::info!("🌐 Browser: using EXTERNAL_BROWSERLESS_WS");
+            ext
         } else if let Some(ref cr) = chrome_remote {
             if cr == "ws://browserless:3000" {
-                // Coolify injects this Docker-alias URL which is only reachable
-                // from within the overlay network. If EXTERNAL_BROWSERLESS_WS is
-                // not set we have no valid remote target — fall back to local Chrome.
-                tracing::warn!(
-                    "CHROME_REMOTE_WS is set to the unroutable Docker alias \
-                     \"ws://browserless:3000\" and EXTERNAL_BROWSERLESS_WS is unset. \
-                     Falling back to local Chrome launch."
+                // Coolify Docker alias — unroutable outside overlay network.
+                // Fail-fast: remote browser is required.
+                panic!(
+                    "CHROME_REMOTE_WS is set to the unroutable Docker alias \"ws://browserless:3000\" \
+                     and EXTERNAL_BROWSERLESS_WS is unset. Remote browser connectivity is required."
                 );
-                None
             } else {
-                tracing::info!(
-                    "🌐 Browser: using CHROME_REMOTE_WS ({})",
-                    cr
-                );
-                chrome_remote
+                tracing::info!("🌐 Browser: using CHROME_REMOTE_WS");
+                cr.clone()
             }
         } else {
-            tracing::info!("🖥️  Browser: no remote CDP URL configured — will launch local Chrome");
-            None
-        };
-
-        // Only probe local Chrome paths when no remote URL is configured.
-        let chrome_path = if remote_websocket_url.is_some() {
-            None
-        } else {
-            std::env::var("CHROME_BIN").ok().or_else(|| {
-                let home = std::env::var("HOME").unwrap_or_default();
-                let possible_paths = [
-                    "/usr/bin/google-chrome",
-                    "/usr/bin/chromium",
-                    "/usr/bin/chromium-browser",
-                    "/usr/bin/chromium-browser",
-                ];
-                let dynamic_path = format!("{}/bin/chrome-linux64/chrome", home);
-                let all_paths = possible_paths
-                    .iter()
-                    .copied()
-                    .chain(std::iter::once(dynamic_path.as_str()));
-
-                for path in all_paths {
-                    if std::path::Path::new(path).exists() {
-                        return Some(path.to_string());
-                    }
-                }
-                None
-            })
+            panic!(
+                "Remote browser URL not configured. Set EXTERNAL_BROWSERLESS_WS or CHROME_REMOTE_WS environment variable."
+            );
         };
 
         Self {
             remote_websocket_url,
             max_tabs: 10,
-            chrome_path,
-            headless: true,
-            sandbox: false,
-            user_agent: None,
-            window_size: Some((1920, 1080)),
         }
     }
 }
 
-/// A pool of browser tabs backed by a single browser instance.
+/// A pool of browser tabs backed by a single remote browser instance.
 ///
 /// # Example
 ///
@@ -122,259 +66,73 @@ impl Default for BrowserPoolConfig {
 /// use rustexpress::browser::{BrowserPool, BrowserPoolConfig};
 ///
 /// let pool = BrowserPool::new(BrowserPoolConfig::default()).await?;
-///
-/// // Get a tab from the pool
 /// let tab = pool.get_tab().await?;
-///
-/// // Navigate and scrape
 /// tab.goto("https://example.com").await?;
 /// let html = tab.content().await?;
-///
-/// // Tab is automatically returned to the pool when dropped
 /// ```
 pub struct BrowserPool {
-    /// The browser instance (single process)
-    browser: tokio::sync::RwLock<Arc<Browser>>,
-    /// Available (idle) tabs
-    available_tabs: Mutex<Vec<Arc<Page>>>,
+    /// Available (idle) tab IDs
+    available_tabs: Mutex<Vec<String>>,
     /// Semaphore to limit concurrent tabs
     semaphore: Arc<Semaphore>,
     /// Configuration
     config: BrowserPoolConfig,
+    /// Counter for generating unique tab IDs
+    tab_counter: AtomicU64,
 }
 
 impl BrowserPool {
-    /// Create a new browser pool.
+    /// Create a new browser pool connecting to a remote CDP endpoint.
     ///
-    /// When `config.remote_websocket_url` is set the pool will **connect** to
-    /// an already-running Chrome/Chromium instance via the Chrome DevTools
-    /// Protocol WebSocket endpoint (e.g. a `browserless/chrome` Docker sidecar).
-    /// Otherwise it **launches** a local Chrome/Chromium process.
+    /// The pool will attempt to connect to the remote browser URL specified in
+    /// BrowserPoolConfig. If the connection fails, an error is returned.
     pub async fn new(config: BrowserPoolConfig) -> anyhow::Result<Arc<Self>> {
-        info!(
-            "🌐 Initializing browser pool with max {} tabs",
-            config.max_tabs
-        );
+        info!("Initializing browser pool (remote: {}) with max {} tabs",
+              config.remote_websocket_url, config.max_tabs);
 
-        let (browser, handler) = Self::connect_or_launch(&config).await?;
+        // Verify connection to remote browser with a simple health check
+        Self::verify_remote_connection(&config).await?;
 
         let pool = Arc::new(Self {
-            browser: tokio::sync::RwLock::new(Arc::new(browser)),
             available_tabs: Mutex::new(Vec::new()),
             semaphore: Arc::new(Semaphore::new(config.max_tabs)),
             config: config.clone(),
+            tab_counter: AtomicU64::new(0),
         });
 
-        // Spawn browser event handler & automatic restarter.
-        //
-        // Failure model:
-        //   - Every time the WS stream terminates (handler.next() → None) we
-        //     increment `fail_count` and attempt a reconnect.
-        //   - Every time a reconnect *attempt* itself fails we also increment
-        //     `fail_count` (previously this path was missing the increment,
-        //     allowing infinite loops through the failure branch).
-        //   - A successful reconnect resets `fail_count` to 0 so the new
-        //     session gets a fresh 5-attempt budget.
-        //   - Backoff is exponential (2^n seconds) capped at 30 s to avoid
-        //     storm-reconnecting on rapid RST drops (ResetWithoutClosingHandshake).
-        let pool_clone = pool.clone();
-        tokio::spawn(async move {
-            let mut current_handler = handler;
-            let mut fail_count: u32 = 0;
-            const MAX_FAILS: u32 = 5;
-
-            loop {
-                // Drain the event stream. Any event received means the
-                // connection is alive; reset the failure counter.
-                while let Some(event) = current_handler.next().await {
-                    if let Err(e) = event {
-                        tracing::error!("Browser WS connection error detected in stream: {:?}", e);
-                        break;
-                    }
-                    if fail_count > 0 {
-                        fail_count = 0;
-                    }
-                    debug!("Browser event: {:?}", event);
-                }
-
-                // Stream exhausted — WS is dead (incl. ResetWithoutClosingHandshake).
-                fail_count += 1;
-                tracing::error!(
-                    fail_count,
-                    max = MAX_FAILS,
-                    "Browser WS connection dropped — scheduling reconnect"
-                );
-
-                if fail_count > MAX_FAILS {
-                    tracing::error!(
-                        "Browser connection failed {} consecutive times. Shutting down.",
-                        MAX_FAILS
-                    );
-                    std::process::exit(1);
-                }
-
-                // Exponential backoff: 2, 4, 8, 16, 30 seconds (capped).
-                let backoff_secs = std::cmp::min(2u64.pow(fail_count), 30);
-                tracing::warn!(
-                    "Reconnect attempt {}/{} in {}s…",
-                    fail_count, MAX_FAILS, backoff_secs
-                );
-                tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)).await;
-
-                match Self::connect_or_launch(&pool_clone.config).await {
-                    Ok((new_browser, new_handler)) => {
-                        tracing::info!("✅ Successfully reconnected browser (was fail #{}).", fail_count);
-
-                        // Reset counter — fresh budget for the new session.
-                        fail_count = 0;
-
-                        // Atomically swap in the new Browser Arc.
-                        {
-                            let mut b = pool_clone.browser.write().await;
-                            *b = Arc::new(new_browser);
-                        }
-
-                        // Discard every stale Page handle — they all reference
-                        // the old (now-dead) CDP session.
-                        pool_clone.available_tabs.lock().await.clear();
-
-                        // Adopt the new event stream.
-                        current_handler = new_handler;
-
-                        // Re-warm the tab pool so the first request after a
-                        // reconnect is still fast.
-                        let warm_count = std::cmp::min(5, pool_clone.config.max_tabs);
-                        for _ in 0..warm_count {
-                            match pool_clone.create_new_tab().await {
-                                Ok(tab) => pool_clone.available_tabs.lock().await.push(tab),
-                                Err(e) => {
-                                    tracing::warn!("Failed to pre-warm tab after reconnect: {}", e);
-                                    break;
-                                }
-                            }
-                        }
-                        tracing::info!(
-                            "✅ Browser pool re-warmed with {} tabs.",
-                            pool_clone.available_tabs.lock().await.len()
-                        );
-                    }
-                    Err(e) => {
-                        // Reconnect attempt itself failed — this counts as
-                        // another failure toward the shutdown threshold.
-                        fail_count += 1;
-                        tracing::error!(
-                            fail_count,
-                            max = MAX_FAILS,
-                            "Reconnect attempt failed: {}",
-                            e
-                        );
-                        if fail_count > MAX_FAILS {
-                            tracing::error!(
-                                "Browser reconnect failed {} consecutive times. Shutting down.",
-                                MAX_FAILS
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-                }
-            }
-        });
-
-        info!("✅ Browser ready");
-
-        // Pre-warm tabs for faster first requests
-        // Dynamic "pool dinamis" as requested: warm up half of max tabs or at least 5
-        let warm_count = std::cmp::min(5, config.max_tabs);
-        for i in 0..warm_count {
-            match pool.create_new_tab().await {
-                Ok(tab) => {
-                    pool.available_tabs.lock().await.push(tab);
-                    debug!("Pre-warmed tab {}/{}", i + 1, warm_count);
-                }
-                Err(e) => {
-                    warn!("Failed to pre-warm tab: {}", e);
-                    break;
-                }
-            }
-        }
-        info!(
-            "✅ Browser pool initialized with {} warm tabs",
-            pool.available_tabs.lock().await.len()
-        );        Ok(pool)
+        info!("Browser pool initialized (remote-only)");
+        Ok(pool)
     }
 
-    /// Internal method to establish connection or launch Chrome
-    async fn connect_or_launch(config: &BrowserPoolConfig) -> anyhow::Result<(Browser, chromiumoxide::Handler)> {
-        if let Some(ref ws_url) = config.remote_websocket_url {
-            tracing::info!("🔗 Connecting to remote Chrome via CDP: {}", ws_url);
-            Browser::connect(ws_url)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to connect to remote browser at {}: {}", ws_url, e))
-        } else {
-            tracing::info!("🚀 Launching local Chrome instance");
+    /// Verify connection to the remote browser.
+    async fn verify_remote_connection(config: &BrowserPoolConfig) -> anyhow::Result<()> {
+        let client = reqwest::Client::new();
 
-            let mut browser_config = BrowserConfig::builder();
+        // Try a simple health check endpoint
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            client
+                .get(format!("{}/health", config.remote_websocket_url))
+                .send(),
+        )
+        .await;
 
-            if !config.headless {
-                browser_config = browser_config.with_head();
+        match response {
+            Ok(Ok(r)) if r.status().is_success() => {
+                info!("Remote browser health check passed");
+                Ok(())
             }
-
-            if !config.sandbox {
-                browser_config = browser_config.no_sandbox();
+            Ok(Ok(r)) => {
+                warn!("Remote browser health check returned: {}", r.status());
+                // Don't fail hard - might work despite health check
+                Ok(())
             }
-
-            if let Some(ref path) = config.chrome_path {
-                browser_config = browser_config.chrome_executable(path);
+            Ok(Err(e)) => {
+                Err(anyhow::anyhow!("Failed to connect to remote browser: {}", e))
             }
-
-            if let Some((width, height)) = config.window_size {
-                browser_config = browser_config.window_size(width, height);
+            Err(_) => {
+                Err(anyhow::anyhow!("Remote browser connection timeout"))
             }
-
-            if let Some(ref ua) = config.user_agent {
-                browser_config = browser_config.arg(format!("--user-agent={}", ua));
-            } else {
-                browser_config = browser_config.arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            }
-
-            browser_config = browser_config
-                .arg("--disable-blink-features=AutomationControlled")
-                .arg("--disable-gpu")
-                .arg("--disable-dev-shm-usage")
-                .arg("--disable-setuid-sandbox")
-                .arg("--no-first-run")
-                .arg("--no-zygote")
-                .arg("--disable-extensions")
-                .arg("--disable-background-networking")
-                .arg("--disable-background-timer-throttling")
-                .arg("--disable-backgrounding-occluded-windows")
-                .arg("--disable-breakpad")
-                .arg("--disable-component-extensions-with-background-pages")
-                .arg("--disable-ipc-flooding-protection")
-                .arg("--disable-renderer-backgrounding")
-                .arg("--enable-features=NetworkService,NetworkServiceInProcess")
-                .arg("--force-color-profile=srgb")
-                .arg("--disable-web-security")
-                .arg("--disable-features=IsolateOrigins,site-per-process")
-                .arg("--allow-running-insecure-content")
-                .arg("--disable-infobars")
-                .arg("--window-position=0,0")
-                .arg("--ignore-certificate-errors")
-                .arg("--ignore-certificate-errors-spki-list")
-                .arg("--disable-blink-features");
-
-            let unique_id = uuid_v4();
-            let user_data_dir =
-                std::env::temp_dir().join(format!("rustexpress-browser-{}", unique_id));
-            let browser_config = browser_config.user_data_dir(&user_data_dir);
-
-            let browser_config = browser_config
-                .build()
-                .map_err(|e| anyhow::anyhow!("Failed to build browser config: {}", e))?;
-
-            Browser::launch(browser_config)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to launch local browser: {}", e))
         }
     }
 
@@ -386,59 +144,23 @@ impl BrowserPool {
         // Acquire semaphore permit (limits concurrent tabs)
         let permit = self.semaphore.clone().acquire_owned().await?;
 
-        // Try to get an existing tab
-        let page = {
+        // Try to reuse an existing tab ID, or generate a new one
+        let tab_id = {
             let mut tabs = self.available_tabs.lock().await;
-            tabs.pop()
+            tabs.pop().unwrap_or_else(|| {
+                let id = self.tab_counter.fetch_add(1, Ordering::SeqCst);
+                format!("tab-{}", id)
+            })
         };
 
-        let page = match page {
-            Some(page) => {
-                debug!("Reusing existing tab");
-                // Navigate to blank page to reset state
-                if let Err(e) = page.goto("about:blank").await {
-                    warn!("Failed to reset tab, creating new one: {}", e);
-                    self.create_new_tab().await?
-                } else {
-                    page
-                }
-            }
-            None => {
-                debug!("Creating new tab");
-                self.create_new_tab().await?
-            }
-        };
+        debug!("Allocated tab: {}", tab_id);
 
         Ok(PooledTab {
-            page,
+            tab_id,
+            cdp_url: self.config.remote_websocket_url.clone(),
             pool: Arc::clone(self),
             _permit: permit,
         })
-    }
-
-    /// Create a new tab.
-    async fn create_new_tab(&self) -> anyhow::Result<Arc<Page>> {
-        let browser = self.browser.read().await.clone();
-        let page = browser
-            .new_page("about:blank")
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create new tab: {}", e))?;
-
-        Ok(Arc::new(page))
-    }
-
-    /// Return a tab to the pool for reuse.
-    async fn return_tab(&self, page: Arc<Page>) {
-        let mut tabs = self.available_tabs.lock().await;
-
-        // Only keep up to max_tabs in the pool
-        if tabs.len() < self.config.max_tabs {
-            tabs.push(page);
-            debug!("Tab returned to pool (available: {})", tabs.len());
-        } else {
-            debug!("Pool full, discarding tab");
-            // Tab will be dropped and closed
-        }
     }
 
     /// Get the number of available (idle) tabs in the pool.
@@ -446,50 +168,74 @@ impl BrowserPool {
         self.available_tabs.lock().await.len()
     }
 
-    /// Close the browser and all tabs.
+    /// Close the browser pool.
     pub async fn close(&self) -> anyhow::Result<()> {
         info!("Closing browser pool");
-        // Clear available tabs
         self.available_tabs.lock().await.clear();
-        // Browser will be closed when dropped
         Ok(())
     }
 }
 
-/// A tab borrowed from the pool.
+/// A tab borrowed from the pool (remote CDP-based).
 ///
-/// When dropped, the tab is automatically returned to the pool.
+/// This is a lightweight wrapper that communicates with a remote Chrome instance
+/// via HTTP calls to the browser service. The tab is returned to the pool when dropped.
 pub struct PooledTab {
-    page: Arc<Page>,
+    /// Unique identifier for this tab
+    pub tab_id: String,
+    /// Remote CDP/browser service URL
+    cdp_url: String,
+    /// Pool reference for returning on drop
     pool: Arc<BrowserPool>,
+    /// Semaphore permit (released on drop)
     _permit: tokio::sync::OwnedSemaphorePermit,
 }
 
 impl PooledTab {
     /// Navigate to a URL.
     pub async fn goto(&self, url: &str) -> anyhow::Result<()> {
-        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.goto(url))
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout navigating to {}", url))?
-            .map_err(|e| anyhow::anyhow!("Failed to navigate to {}: {}", url, e))?;
-        Ok(())
-    }
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
 
-    /// Wait for navigation to complete.
-    pub async fn wait_for_navigation(&self) -> anyhow::Result<()> {
-        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.wait_for_navigation())
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout waiting for navigation"))?
-            .map_err(|e| anyhow::anyhow!("Navigation timeout: {}", e))?;
-        Ok(())
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/goto", self.cdp_url))
+                .json(&json!({ "url": url }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout navigating to {}", url))?
+        .map_err(|e| anyhow::anyhow!("Failed to navigate to {}: {}", url, e))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to navigate to {}: {}",
+                url,
+                response.status()
+            ))
+        }
     }
 
     /// Get the page content (HTML).
     pub async fn content(&self) -> anyhow::Result<String> {
-        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.content())
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client.post(format!("{}/content", self.cdp_url)).send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout getting page content"))?
+        .map_err(|e| anyhow::anyhow!("Failed to get page content: {}", e))?;
+
+        response
+            .text()
             .await
-            .map_err(|_| anyhow::anyhow!("Timeout getting page content"))?
-            .map_err(|e| anyhow::anyhow!("Failed to get page content: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to read response body: {}", e))
     }
 
     /// Execute JavaScript and return the result.
@@ -497,93 +243,165 @@ impl PooledTab {
         &self,
         expression: &str,
     ) -> anyhow::Result<T> {
-        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.evaluate(expression))
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/evaluate", self.cdp_url))
+                .json(&json!({ "expression": expression }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout evaluating JS"))?
+        .map_err(|e| anyhow::anyhow!("Failed to evaluate JS: {}", e))?;
+
+        let data: serde_json::Value = response
+            .json()
             .await
-            .map_err(|_| anyhow::anyhow!("Timeout evaluating JS"))?
-            .map_err(|e| anyhow::anyhow!("Failed to evaluate JS: {}", e))?
-            .into_value()
-            .map_err(|e| anyhow::anyhow!("Failed to convert JS result: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to parse JS result: {}", e))?;
+
+        serde_json::from_value(data).map_err(|e| anyhow::anyhow!("Invalid JS result: {}", e))
     }
 
     /// Wait for a selector to appear.
     pub async fn wait_for_selector(&self, selector: &str) -> anyhow::Result<()> {
-        tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout waiting for selector '{}'", selector))?
-            .map_err(|e| anyhow::anyhow!("Selector '{}' not found: {}", selector, e))?;
-        Ok(())
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/waitForSelector", self.cdp_url))
+                .json(&json!({ "selector": selector }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout waiting for selector '{}'", selector))?
+        .map_err(|e| anyhow::anyhow!("Selector '{}' error: {}", selector, e))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Selector '{}' not found: {}",
+                selector,
+                response.status()
+            ))
+        }
     }
 
     /// Click an element by selector.
     pub async fn click(&self, selector: &str) -> anyhow::Result<()> {
-        let element = tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout locating click element '{}'", selector))?
-            .map_err(|e| anyhow::anyhow!("Element '{}' not found: {}", selector, e))?;
-        tokio::time::timeout(std::time::Duration::from_secs(15), element.click())
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout during click '{}'", selector))?
-            .map_err(|e| anyhow::anyhow!("Failed to click '{}': {}", selector, e))?;
-        Ok(())
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/click", self.cdp_url))
+                .json(&json!({ "selector": selector }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout clicking element"))?
+        .map_err(|e| anyhow::anyhow!("Click error: {}", e))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to click '{}': {}",
+                selector,
+                response.status()
+            ))
+        }
     }
 
     /// Type text into an element.
     pub async fn type_text(&self, selector: &str, text: &str) -> anyhow::Result<()> {
-        let element = tokio::time::timeout(std::time::Duration::from_secs(15), self.page.find_element(selector))
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout locating element for typing '{}'", selector))?
-            .map_err(|e| anyhow::anyhow!("Element '{}' not found: {}", selector, e))?;
-        tokio::time::timeout(std::time::Duration::from_secs(15), element.type_str(text))
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout typing into '{}'", selector))?
-            .map_err(|e| anyhow::anyhow!("Failed to type into '{}': {}", selector, e))?;
-        Ok(())
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/type", self.cdp_url))
+                .json(&json!({ "selector": selector, "text": text }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout typing text"))?
+        .map_err(|e| anyhow::anyhow!("Type error: {}", e))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to type into '{}': {}",
+                selector,
+                response.status()
+            ))
+        }
     }
 
     /// Take a screenshot as PNG bytes.
     pub async fn screenshot(&self) -> anyhow::Result<Vec<u8>> {
-        let future = self.page.screenshot(
-            chromiumoxide::page::ScreenshotParams::builder()
-                .full_page(true)
-                .build(),
-        );
-        tokio::time::timeout(std::time::Duration::from_secs(15), future)
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(15);
+
+        let response = tokio::time::timeout(
+            timeout,
+            client
+                .post(format!("{}/screenshot", self.cdp_url))
+                .json(&json!({ "fullPage": true }))
+                .send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout taking screenshot"))?
+        .map_err(|e| anyhow::anyhow!("Failed to take screenshot: {}", e))?;
+
+        response
+            .bytes()
             .await
-            .map_err(|_| anyhow::anyhow!("Timeout taking screenshot"))?
-            .map_err(|e| anyhow::anyhow!("Failed to take screenshot: {}", e))
+            .map(|b| b.to_vec())
+            .map_err(|e| anyhow::anyhow!("Failed to read screenshot bytes: {}", e))
     }
 
     /// Get the current URL.
     pub async fn url(&self) -> anyhow::Result<String> {
-        tokio::time::timeout(std::time::Duration::from_secs(10), self.page.url())
-            .await
-            .map_err(|_| anyhow::anyhow!("Timeout getting URL"))?
-            .map_err(|e| anyhow::anyhow!("Failed to get URL: {}", e))
-            .map(|u| u.map(|url| url.to_string()).unwrap_or_default())
-    }
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_secs(10);
 
-    /// Get access to the underlying Page for advanced operations.
-    pub fn page(&self) -> &Page {
-        &self.page
+        let response = tokio::time::timeout(
+            timeout,
+            client.post(format!("{}/url", self.cdp_url)).send(),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout getting URL"))?
+        .map_err(|e| anyhow::anyhow!("Failed to get URL: {}", e))?;
+
+        response
+            .text()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read URL: {}", e))
     }
 }
 
 impl Drop for PooledTab {
     fn drop(&mut self) {
-        // Return the tab to the pool
-        let page = Arc::clone(&self.page);
         let pool = Arc::clone(&self.pool);
+        let tab_id = self.tab_id.clone();
 
-        // Use a blocking channel to ensure the tab is returned
-        // This prevents memory leaks from dropped tasks
         let rt = tokio::runtime::Handle::try_current();
         if let Ok(handle) = rt {
             handle.spawn(async move {
-                pool.return_tab(page).await;
+                // Return tab ID to available pool for reuse
+                pool.available_tabs.lock().await.push(tab_id);
             });
         } else {
-            // Fallback: if we can't get runtime, just log warning
-            tracing::warn!("Cannot return tab to pool: no tokio runtime available");
+            warn!("Cannot return tab: no tokio runtime available");
         }
     }
 }

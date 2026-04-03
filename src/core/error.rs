@@ -15,8 +15,6 @@ pub enum AppError {
     ScraperError(String),
     #[error("Fantoccini error: {0}")]
     FantocciniError(String),
-    #[error("Chromiumoxide error: {0}")]
-    ChromiumoxideError(String),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Timeout error: {0}")]

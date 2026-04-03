@@ -8,10 +8,10 @@ RustExpress utilizes a scraping engine for data extraction from Anime and Komik 
    - Used for server-side rendered (SSR) content.
    - Low resource footprint.
    - CSS selectors for data extraction.
-2. **Headless Browser (`chromiumoxide`)**:
+2. **Headless Browser (Remote)**:
    - Used for dynamic SPA sites and client-side rendering.
-   - Configurable viewport and user-agent.
-   - Resource reuse via a managed **Browser Pool**.
+   - Communicates via HTTP to remote Chrome service.
+   - Configured via `EXTERNAL_BROWSERLESS_WS` or `CHROME_REMOTE_WS`.
 
 ## 🚀 Concurrency & Rate Limiting
 

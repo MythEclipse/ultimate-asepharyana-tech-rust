@@ -36,7 +36,7 @@ If you are an AI assistant (Gemini, Claude, GPT, etc.) working on this repositor
 - **Database**: [SeaORM](https://www.sea-ql.org/SeaORM/) (MySQL) - Database abstraction layer.
 - **Caching**: `deadpool-redis` & `redis` - In-memory data store for cache mapping.
 - **Observability**: [Prometheus](https://prometheus.io/) - Performance instrumentation and histograms.
-- **Scraping**: `scraper` (Static HTML) & `chromiumoxide` (Headless Chrome).
+- **Scraping**: `scraper` (Static HTML) & remote Chrome service via HTTP.
 
 ## 📊 Monitoring
 

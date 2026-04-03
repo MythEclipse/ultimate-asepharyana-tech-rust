@@ -48,9 +48,7 @@ impl Application {
 
         // Browser Pool
         tracing::info!("Initializing browser pool...");
-        let mut browser_config = crate::browser::BrowserPoolConfig::default();
-        browser_config.headless = true;
-        browser_config.sandbox = false;
+        let browser_config = crate::browser::BrowserPoolConfig::default();
         match crate::browser::pool::init_browser_pool(browser_config).await {
             Ok(_) => tracing::info!("✓ Browser pool initialized"),
             Err(e) => tracing::error!("⚠️ Failed to initialize browser pool: {}", e),

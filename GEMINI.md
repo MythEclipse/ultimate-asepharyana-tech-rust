@@ -28,7 +28,7 @@ An asynchronous service for scraping and image proxying. All secondary web frame
 - **ORM**: [SeaORM](https://www.sea-ql.org/SeaORM/) (MySQL) - Database abstraction.
 - **Caching**: `deadpool-redis` & `redis` - In-memory cache mapping.
 - **Observability**: [Prometheus](https://prometheus.io/) - Performance instrumentation.
-- **Scraping**: `scraper` (CSS Selectors) & `chromiumoxide` (Headless Chrome).
+- **Scraping**: `scraper` (CSS Selectors) & remote Chrome via HTTP.
 
 ### 📂 Directory Structure (`apps/rust/src`)
 
