@@ -32,10 +32,10 @@ pub const IMAGE_CACHE_LOCK_TTL: u64 = 60;
 
 /// Picser API endpoints in priority order
 pub const PICSER_API_ENDPOINTS: &[&str] = &[
-    "https://picser.asepharyana.tech/api/upload",
-    "https://picser-two.vercel.app/api/upload",
     "https://picser.pages.dev/api/upload",
     "https://picser-mytheclipse8647-ahoqi9ef.leapcell.dev/api/upload",
+    "https://picser-two.vercel.app/api/upload",
+    "https://picser.asepharyana.tech/api/upload",
 ];
 
 /// Create a hash of the URL for cache key
