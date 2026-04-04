@@ -11,6 +11,8 @@ use axum::{extract::Path, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use tracing::{info};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
@@ -67,6 +69,24 @@ pub struct DetailResponse {
 }
 
 const CACHE_TTL: u64 = 300; // 5 minutes
+
+static EPISODE_SUFFIX_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"-episode-\d+(?:-[a-z0-9-]+)?$").expect("valid episode suffix regex")
+});
+
+fn normalize_detail_slug(raw_slug: &str) -> String {
+    let cleaned = raw_slug.trim().trim_matches('/');
+    let base_slug = if cleaned.starts_with("http://") || cleaned.starts_with("https://") {
+        extract_slug(cleaned)
+    } else {
+        cleaned.to_string()
+    };
+
+    EPISODE_SUFFIX_REGEX
+        .replace(&base_slug, "")
+        .trim_matches('/')
+        .to_string()
+}
 
 
 
@@ -126,14 +146,25 @@ pub async fn slug(
     Path(slug): Path<String>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let _start_time = std::time::Instant::now();
-    info!("Handling request for anime detail slug: {}", slug);
+    let normalized_slug = normalize_detail_slug(&slug);
+    info!(
+        "Handling request for anime detail slug: {} (normalized: {})",
+        slug, normalized_slug
+    );
 
-    let cache_key = format!("anime2:detail:{}", slug);
+    if normalized_slug.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid slug for anime2 detail".to_string(),
+        ));
+    }
+
+    let cache_key = format!("anime2:detail:{}", normalized_slug);
     let cache = Cache::new(&app_state.redis_pool);
 
     let response = cache
         .get_or_set(&cache_key, CACHE_TTL, || async {
-            let mut data = fetch_anime_detail(slug.clone())
+            let mut data = fetch_anime_detail(normalized_slug.clone())
                 .await
                 .map_err(|e| e.to_string())?;
 
