@@ -141,19 +141,28 @@ impl CleanupOldCache {
         let patterns = vec!["anime:*", "komik:*", "user:*:profile", "img_cache:*"];
 
         for pattern in patterns {
-            let keys: Vec<String> = conn
-                .keys(pattern)
-                .await
-                .map_err(|e| format!("Failed to get keys: {}", e))?;
+            let keys = {
+                let mut iter: deadpool_redis::redis::AsyncIter<'_, String> = conn
+                    .scan_match(pattern)
+                    .await
+                    .map_err(|e| format!("Failed to scan keys: {}", e))?;
+
+                let mut keys = Vec::new();
+                while let Some(key) = iter.next_item().await {
+                    keys.push(key);
+                }
+
+                keys
+            };
 
             for key in keys {
-                let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
+                let ttl: i64 = conn.ttl(key.as_str()).await.unwrap_or(-1);
 
                 // TTL = -1 means no expiration (orphaned)
                 // TTL = -2 means key doesn't exist
                 if ttl == -1 {
                     // Set a default TTL of 7 days for orphaned keys
-                    let _: () = conn.expire(&key, 604800).await.unwrap_or(());
+                    let _: () = conn.expire(key.as_str(), 604800).await.unwrap_or(());
                     cleaned += 1;
                 }
             }

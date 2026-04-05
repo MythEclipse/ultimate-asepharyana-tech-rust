@@ -113,14 +113,12 @@ impl Default for RequestId {
 
 /// Logging middleware.
 pub async fn logging_middleware(config: Arc<LoggingConfig>, req: Request, next: Next) -> Response {
-    let path = req.uri().path().to_string();
+    let path = req.uri().path();
 
-    // Skip excluded paths
-    if config.exclude_paths.contains(&path) {
+    if config.exclude_paths.contains(path) {
         return next.run(req).await;
     }
 
-    // Generate or extract request ID
     let request_id = req
         .headers()
         .get("X-Request-ID")
@@ -130,20 +128,14 @@ pub async fn logging_middleware(config: Arc<LoggingConfig>, req: Request, next: 
 
     let method = req.method().clone();
     let uri = req.uri().clone();
-    let _version = format!("{:?}", req.version());
+    let path = uri.path().to_string();
+    let query = uri.query().map(str::to_owned);
 
-    // Log headers if configured
     let headers_log = if config.log_headers {
         let headers: Vec<String> = req
             .headers()
             .iter()
-            .filter(|(name, _)| {
-                // Skip sensitive headers
-                let name_str = name.as_str().to_lowercase();
-                !name_str.contains("authorization")
-                    && !name_str.contains("cookie")
-                    && !name_str.contains("x-api-key")
-            })
+            .filter(|(name, _)| !is_sensitive_header(name.as_str()))
             .map(|(name, value)| format!("{}: {}", name, value.to_str().unwrap_or("<binary>")))
             .collect();
         Some(headers)
@@ -151,19 +143,16 @@ pub async fn logging_middleware(config: Arc<LoggingConfig>, req: Request, next: 
         None
     };
 
-    // Add request ID to extensions
     let mut req = req;
     req.extensions_mut().insert(request_id.clone());
 
-    // Start timing
     let start = Instant::now();
 
-    // Log incoming request
     tracing::info!(
         request_id = %request_id.0,
         method = %method,
-        path = %uri.path(),
-        query = ?uri.query(),
+        path = %path,
+        query = ?query,
         "→ Request started"
     );
 
@@ -171,77 +160,99 @@ pub async fn logging_middleware(config: Arc<LoggingConfig>, req: Request, next: 
         tracing::debug!(request_id = %request_id.0, headers = ?headers, "Request headers");
     }
 
-    // Execute request
     let response = next.run(req).await;
 
-    // Calculate duration
     let duration = start.elapsed();
     let status = response.status();
 
-    // Determine log level based on status
-    let log_entry = format!(
-        "← Response: {} {} -> {} in {:?}",
-        method,
-        uri.path(),
-        status,
-        duration
-    );
-
     match status.as_u16() {
-        100..=399 => match config.success_level {
-            LogLevel::Trace => {
-                tracing::trace!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Debug => {
-                tracing::debug!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Info => {
-                tracing::info!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Warn => {
-                tracing::warn!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Error => {
-                tracing::error!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-        },
-        400..=499 => match config.client_error_level {
-            LogLevel::Trace => {
-                tracing::trace!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Debug => {
-                tracing::debug!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Info => {
-                tracing::info!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Warn => {
-                tracing::warn!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Error => {
-                tracing::error!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-        },
-        _ => match config.server_error_level {
-            LogLevel::Trace => {
-                tracing::trace!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Debug => {
-                tracing::debug!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Info => {
-                tracing::info!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Warn => {
-                tracing::warn!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-            LogLevel::Error => {
-                tracing::error!(request_id = %request_id.0, status = %status, duration_ms = %duration.as_millis(), "{}", log_entry)
-            }
-        },
+        100..=399 => log_response(
+            config.success_level,
+            &request_id,
+            status,
+            duration,
+            &method,
+            &path,
+        ),
+        400..=499 => log_response(
+            config.client_error_level,
+            &request_id,
+            status,
+            duration,
+            &method,
+            &path,
+        ),
+        _ => log_response(
+            config.server_error_level,
+            &request_id,
+            status,
+            duration,
+            &method,
+            &path,
+        ),
     }
 
     response
+}
+
+fn is_sensitive_header(name: &str) -> bool {
+    name.eq_ignore_ascii_case("authorization")
+        || name.eq_ignore_ascii_case("cookie")
+        || name.eq_ignore_ascii_case("x-api-key")
+}
+
+fn log_response(
+    level: LogLevel,
+    request_id: &RequestId,
+    status: StatusCode,
+    duration: std::time::Duration,
+    method: &axum::http::Method,
+    path: &str,
+) {
+    let duration_ms = duration.as_millis();
+
+    match level {
+        LogLevel::Trace => tracing::trace!(
+            request_id = %request_id.0,
+            status = %status,
+            duration_ms = %duration_ms,
+            method = %method,
+            path = %path,
+            "← Response completed"
+        ),
+        LogLevel::Debug => tracing::debug!(
+            request_id = %request_id.0,
+            status = %status,
+            duration_ms = %duration_ms,
+            method = %method,
+            path = %path,
+            "← Response completed"
+        ),
+        LogLevel::Info => tracing::info!(
+            request_id = %request_id.0,
+            status = %status,
+            duration_ms = %duration_ms,
+            method = %method,
+            path = %path,
+            "← Response completed"
+        ),
+        LogLevel::Warn => tracing::warn!(
+            request_id = %request_id.0,
+            status = %status,
+            duration_ms = %duration_ms,
+            method = %method,
+            path = %path,
+            "← Response completed"
+        ),
+        LogLevel::Error => tracing::error!(
+            request_id = %request_id.0,
+            status = %status,
+            duration_ms = %duration_ms,
+            method = %method,
+            path = %path,
+            "← Response completed"
+        ),
+    }
 }
 
 /// Create logging middleware.
