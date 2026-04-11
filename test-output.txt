@@ -1,0 +1,45 @@
+   Compiling rustexpress v0.1.0 (/mnt/code/bp3/ultimate-asepharyana.tech/apps/rust)
+warning: rustexpress@0.1.0: 🔍 Phase 1: Validating API structure...
+warning: rustexpress@0.1.0: ✓ Validation passed
+warning: rustexpress@0.1.0: 🔨 Phase 2: Building API routes...
+warning: rustexpress@0.1.0: 🚀 Using auto-routing system (default)
+warning: rustexpress@0.1.0:  Discovered 35 routes
+warning: rustexpress@0.1.0: 
+warning: rustexpress@0.1.0:     ℹ️  API generated with 35 handlers, 4 modules (auto)
+warning: rustexpress@0.1.0: ✅ API build completed successfully
+warning: use of deprecated struct `redis::AsyncIter`: Deprecated due to the fact that this implementation silently stops at the first value that can't be converted to T. Enable the feature `safe_iterators` for a safe version.
+   --> src/scheduler/cleanup_cache.rs:145:54
+    |
+145 |                 let mut iter: deadpool_redis::redis::AsyncIter<'_, String> = conn
+    |                                                      ^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `rustexpress` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.38s
+     Running `target/debug/test-extreme`
+Testing extreme HTML malformations for foster parenting...
+
+Test: direct_tr_in_div
+Test: direct_td_in_div
+Test: tbody_with_text_sibling
+Test: thead_with_text_sibling
+Test: caption_with_tr
+Test: col_with_tr
+Test: colgroup_with_tr
+Test: tfoot_with_text
+Test: adoption_agency_b_em
+Test: adoption_agency_p_div
+Test: adoption_agency_form_button
+Test: table_with_div_inside_td
+Test: unclosed_tr_before_td
+Test: multiple_tbody_with_issues
+Test: script_special_context
+Test: style_in_table
+Test: deeply_nested_table
+Test: text_before_tbody
+Test: element_before_tbody
+Test: frameset_with_tr
+Test: all_mixed_up
+
+Test completed. Check test_output.log for results.

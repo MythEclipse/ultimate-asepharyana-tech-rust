@@ -9,7 +9,7 @@ use axum::extract::{Query, State};
 use backoff::future::retry;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use scraper::{Html, Selector};
+use scraper::Selector;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use serde_json::json;
@@ -197,7 +197,7 @@ fn parse_filter_page(
     html: &str,
     current_page: u32,
 ) -> Result<(Vec<FilterAnimeItem>, Pagination), Box<dyn std::error::Error + Send + Sync>> {
-    let document = Html::parse_document(html);
+    let document = crate::helpers::parse_html(html);
     let mut anime_list = Vec::new();
 
     for element in document.select(&ITEM_SELECTOR) {

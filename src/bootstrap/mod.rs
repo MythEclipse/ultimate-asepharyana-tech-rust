@@ -25,8 +25,8 @@ impl Application {
     pub async fn build() -> anyhow::Result<Self> {
         // Initialize tracing. Default to warn/error globally unless RUST_LOG is explicitly set.
         let env_filter = match std::env::var("RUST_LOG") {
-            Ok(filter) => EnvFilter::new(filter),
-            Err(_) => EnvFilter::new("warn"),
+            Ok(filter) => EnvFilter::new(filter).add_directive("html5ever=error".parse()?),
+            Err(_) => EnvFilter::new("warn,html5ever=error"),
         };
 
         tracing_subscriber::fmt()
