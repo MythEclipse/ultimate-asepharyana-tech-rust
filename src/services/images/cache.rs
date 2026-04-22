@@ -291,7 +291,7 @@ impl ImageCache {
                 let mut is_valid = false;
                 let mut last_verify_error = String::from("Verification not started");
                 
-                for attempt in 1..=3 {
+                for attempt in 1..=10 {
                     debug!("ImageCache: Verifying CDN URL {} (Attempt {})", cdn_url, attempt);
                     match self.verify_cdn_url(&cdn_url).await {
                         Ok(true) => {
@@ -307,15 +307,15 @@ impl ImageCache {
                         }
                     }
                     
-                    if attempt < 3 {
-                        // Exponential-ish backoff: 500ms, 1000ms
-                        let delay = 500 * attempt;
+                    if attempt < 10 {
+                        // Progressive backoff: 1s, 2s, 3s... up to 10s
+                        let delay = 1000 * attempt;
                         tokio::time::sleep(std::time::Duration::from_millis(delay as u64)).await;
                     }
                 }
 
                 if !is_valid {
-                    error!("ImageCache: CDN verification failed for {} after 3 attempts: {}", cdn_url, last_verify_error);
+                    error!("ImageCache: CDN verification failed for {} after 10 attempts: {}", cdn_url, last_verify_error);
                     return Err(format!("CDN link was not accessible after upload: {}", last_verify_error));
                 }
 
