@@ -35,7 +35,7 @@ fn main() {
 /// Test: Text nodes in <table> are foster-parented to body
 fn test_foster_parenting_text_extraction(html: &str) {
     let document = parse_html(html);
-    let body_sel = Selector::parse("body").unwrap();
+    let body_sel = Selector::parse("body").expect("Valid CSS selector");
     
     let body_text: String = document
         .select(&body_sel)
@@ -43,8 +43,6 @@ fn test_foster_parenting_text_extraction(html: &str) {
         .map(|el| el.text().collect())
         .unwrap_or_default();
 
-    // Evidence: Text that was in <table> is now in body
-    // (fostered out due to HTML5 tree construction algorithm)
     assert!(
         body_text.contains("orphaned text"),
         "Text 'orphaned text' should be present in body (fostered from table)"
@@ -59,15 +57,13 @@ fn test_foster_parenting_text_extraction(html: &str) {
     );
 }
 
-/// Test: Table structure is preserved despite text nodes
 fn test_foster_parenting_table_structure(html: &str) {
     let document = parse_html(html);
     
-    let table_sel = Selector::parse("table").unwrap();
-    let tr_sel = Selector::parse("tr").unwrap();
-    let td_sel = Selector::parse("td").unwrap();
+    let table_sel = Selector::parse("table").expect("Valid CSS selector");
+    let tr_sel = Selector::parse("tr").expect("Valid CSS selector");
+    let td_sel = Selector::parse("td").expect("Valid CSS selector");
 
-    // Table and row structure should be intact
     let tables: Vec<_> = document.select(&table_sel).collect();
     assert_eq!(tables.len(), 1, "Should have exactly 1 table");
 
@@ -77,28 +73,19 @@ fn test_foster_parenting_table_structure(html: &str) {
     let cells: Vec<_> = document.select(&td_sel).collect();
     assert_eq!(cells.len(), 1, "Should have exactly 1 cell");
 
-    // Cell content is preserved
     if let Some(cell) = cells.first() {
         let cell_text: String = cell.text().collect();
         assert_eq!(cell_text.trim(), "cell content", "Cell content should be preserved");
     }
 }
 
-/// Test: Parsed output assertion for baseline
-/// 
-/// This establishes the EXPECTED behavior when parsing problematic HTML.
-/// After the fix is implemented, this test should still pass,
-/// meaning the warning is gone but output is unchanged.
 fn test_expected_parsed_output_assertion(html: &str) {
     let document = parse_html(html);
     
-    // Extract complete text representation
-    let body_sel = Selector::parse("body").unwrap();
+    let body_sel = Selector::parse("body").expect("Valid CSS selector");
     let body = document.select(&body_sel).next().expect("body should exist");
     let full_text: String = body.text().collect();
 
-    // ASSERTION: This is what we expect after parsing
-    // The text nodes have been moved out of the table (fostered)
     let expected_pattern = "orphaned textmore textcell content";
     assert!(
         full_text.contains(&expected_pattern) || 

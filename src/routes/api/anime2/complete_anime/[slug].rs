@@ -150,7 +150,7 @@ fn parse_anime_page(
 
     // Parse pagination using shared parser
     let current_page = slug.parse::<u32>().unwrap_or(1);
-    let pagination = parsers::parse_pagination(&document, current_page);
+    let pagination = parsers::parse_pagination(&document, current_page)?;
 
     let duration = start_time.elapsed();
     info!("Parsed {} anime items in {:?}", anime_list.len(), duration);
@@ -159,5 +159,5 @@ fn parse_anime_page(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/complete_anime/{slug}", axum::routing::get(slug))
+    router.route("/api/anime2/complete_anime/{slug}.rs", axum::routing::get(slug))
 }

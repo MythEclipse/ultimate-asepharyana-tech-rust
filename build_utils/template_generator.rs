@@ -1,4 +1,4 @@
-use crate::build_utils::constants::DYNAMIC_REGEX;
+use crate::build_utils::constants::get_dynamic_regex;
 use crate::build_utils::path_utils::{
     generate_default_description, sanitize_operation_id, sanitize_tag,
 };
@@ -172,7 +172,7 @@ pub fn extract_path_params_from_route(route_path_str: &str) -> Vec<(String, Stri
     let mut path_params = Vec::new();
 
     // Check for bracket notation first (legacy)
-    for cap in DYNAMIC_REGEX.captures_iter(route_path_str) {
+    for cap in get_dynamic_regex().captures_iter(route_path_str) {
         let param = &cap[1];
         if param.starts_with("...") {
             // Catch-all parameter

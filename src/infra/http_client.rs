@@ -12,7 +12,7 @@ pub struct HttpClient {
 
 impl HttpClient {
     /// Create a new HTTP client with default settings.
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
         let client = ClientBuilder::new()
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
@@ -21,21 +21,21 @@ impl HttpClient {
             .tcp_nodelay(true)
             .user_agent("RustExpress/1.0")
             .build()
-            .expect("Failed to build HTTP client");
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-        Self { inner: client }
+        Ok(Self { inner: client })
     }
 
     /// Create with custom timeout.
-    pub fn with_timeout(timeout_secs: u64) -> Self {
+    pub fn with_timeout(timeout_secs: u64) -> Result<Self, String> {
         let client = ClientBuilder::new()
             .timeout(Duration::from_secs(timeout_secs))
             .connect_timeout(Duration::from_secs(10))
             .user_agent("RustExpress/1.0")
             .build()
-            .expect("Failed to build HTTP client");
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-        Self { inner: client }
+        Ok(Self { inner: client })
     }
 
     /// GET request.
@@ -88,36 +88,48 @@ impl HttpClient {
 
 impl Default for HttpClient {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Valid HTTP client configuration")
     }
 }
 
-// Global singleton
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 
+static HTTP_CLIENT_INIT: Lazy<Result<Arc<HttpClient>, String>> = Lazy::new(|| {
+    HttpClient::new()
+        .map(|c| Arc::new(c))
+        .map_err(|e| format!("Failed to initialize HTTP client: {}", e))
+});
+
+static HTTP_CLIENT_FAST_INIT: Lazy<Result<Arc<HttpClient>, String>> = Lazy::new(|| {
+    HttpClient::with_timeout(10)
+        .map(|c| Arc::new(c))
+        .map_err(|e| format!("Failed to initialize fast HTTP client: {}", e))
+});
+
+static HTTP_CLIENT_SLOW_INIT: Lazy<Result<Arc<HttpClient>, String>> = Lazy::new(|| {
+    HttpClient::with_timeout(60)
+        .map(|c| Arc::new(c))
+        .map_err(|e| format!("Failed to initialize slow HTTP client: {}", e))
+});
+
 /// Global HTTP client instance (30s timeout - general purpose).
-pub static HTTP_CLIENT: Lazy<Arc<HttpClient>> = Lazy::new(|| Arc::new(HttpClient::new()));
-
-/// Fast HTTP client (10s timeout - for API calls).
-pub static HTTP_CLIENT_FAST: Lazy<Arc<HttpClient>> =
-    Lazy::new(|| Arc::new(HttpClient::with_timeout(10)));
-
-/// Slow HTTP client (60s timeout - for large downloads).
-pub static HTTP_CLIENT_SLOW: Lazy<Arc<HttpClient>> =
-    Lazy::new(|| Arc::new(HttpClient::with_timeout(60)));
-
-/// Get the global HTTP client.
 pub fn http_client() -> &'static HttpClient {
-    &HTTP_CLIENT
+    HTTP_CLIENT_INIT
+        .as_ref()
+        .expect("HTTP client initialization failed")
 }
 
 /// Get the fast HTTP client (10s timeout).
 pub fn http_client_fast() -> &'static HttpClient {
-    &HTTP_CLIENT_FAST
+    HTTP_CLIENT_FAST_INIT
+        .as_ref()
+        .expect("Fast HTTP client initialization failed")
 }
 
 /// Get the slow HTTP client (60s timeout).
 pub fn http_client_slow() -> &'static HttpClient {
-    &HTTP_CLIENT_SLOW
+    HTTP_CLIENT_SLOW_INIT
+        .as_ref()
+        .expect("Slow HTTP client initialization failed")
 }

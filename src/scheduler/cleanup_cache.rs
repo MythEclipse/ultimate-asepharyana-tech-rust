@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use crate::entities::image_cache;
 use crate::helpers::cache::Cache;
-use crate::infra::redis::REDIS_POOL;
+use crate::infra::redis::get_redis_pool;
 
 use super::ScheduledTask;
 
@@ -116,8 +116,8 @@ impl CleanupOldCache {
             .map_err(|e| e.to_string())?;
 
         // Also clean from Redis
-        let redis_pool = REDIS_POOL.clone();
-        let cache = Cache::new(&redis_pool);
+        let redis_pool = get_redis_pool().map_err(|e| e.to_string())?;
+        let cache = Cache::new(redis_pool);
         for img in old_images {
             let cache_key = format!("img_cache:{}", Self::hash_url(&img.original_url));
             let _ = cache.delete(&cache_key).await;
@@ -130,7 +130,8 @@ impl CleanupOldCache {
     async fn cleanup_orphaned_redis_keys(&self) -> Result<usize, String> {
         use deadpool_redis::redis::AsyncCommands;
 
-        let mut conn = REDIS_POOL
+        let pool = get_redis_pool().map_err(|e| e.to_string())?;
+        let mut conn = pool
             .get()
             .await
             .map_err(|e| format!("Failed to get Redis connection: {}", e))?;
@@ -173,7 +174,8 @@ impl CleanupOldCache {
 
     /// Compact Redis memory to free up fragmented space.
     async fn compact_redis_memory(&self) -> Result<(), String> {
-        let mut conn = REDIS_POOL
+        let pool = get_redis_pool().map_err(|e| e.to_string())?;
+        let mut conn = pool
             .get()
             .await
             .map_err(|e| format!("Failed to get Redis connection: {}", e))?;

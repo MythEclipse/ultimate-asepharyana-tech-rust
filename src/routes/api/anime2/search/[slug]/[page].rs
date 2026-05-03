@@ -132,11 +132,11 @@ fn parse_search_document(
 
     // Parse pagination using shared parser
     let current_page = page;
-    let pagination = parsers::parse_pagination_with_string(&document, current_page);
+    let pagination = parsers::parse_pagination_with_string(&document, current_page)?;
 
     Ok((data, pagination))
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/search/{slug}/{page}", axum::routing::get(page))
+    router.route("/api/anime2/search/{slug}/{page}.rs", axum::routing::get(page))
 }

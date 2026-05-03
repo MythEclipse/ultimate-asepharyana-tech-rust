@@ -295,5 +295,5 @@ mod tests {
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime", axum::routing::get(anime))
+    router.route("/api/anime/index.rs", axum::routing::get(anime))
 }

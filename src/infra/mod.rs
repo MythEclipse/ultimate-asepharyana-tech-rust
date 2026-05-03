@@ -6,5 +6,5 @@ pub mod image_proxy;
 pub mod proxy;
 pub mod redis;
 
-pub use http_client::{http_client, HttpClient, HTTP_CLIENT};
-pub use redis::REDIS_POOL;
+pub use http_client::{http_client, HttpClient};
+pub use redis::get_redis_conn;

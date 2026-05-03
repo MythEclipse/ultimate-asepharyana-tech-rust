@@ -26,33 +26,35 @@ pub struct AnimeSelectors {
 }
 
 impl AnimeSelectors {
-    pub fn new() -> Self {
-        Self {
-            item: selector("article.bs").unwrap(),
-            title: selector(".tt h2").unwrap(),
-            link: selector("a").unwrap(),
-            img: selector("img").unwrap(),
-            episode: selector(".epx").unwrap(),
-            score: selector(".numscore").unwrap(),
-            status: selector(".status").unwrap(),
-            genre: selector(".genres a").unwrap(),
-            rating: selector(".score").unwrap(),
-            type_sel: selector(".typez").unwrap(),
-            season: selector(".season").unwrap(),
-            desc: selector(".data .typez").unwrap(),
-        }
+    pub fn new() -> Result<Self, String> {
+        Ok(Self {
+            item: selector("article.bs").ok_or("Invalid selector: article.bs")?,
+            title: selector(".tt h2").ok_or("Invalid selector: .tt h2")?,
+            link: selector("a").ok_or("Invalid selector: a")?,
+            img: selector("img").ok_or("Invalid selector: img")?,
+            episode: selector(".epx").ok_or("Invalid selector: .epx")?,
+            score: selector(".numscore").ok_or("Invalid selector: .numscore")?,
+            status: selector(".status").ok_or("Invalid selector: .status")?,
+            genre: selector(".genres a").ok_or("Invalid selector: .genres a")?,
+            rating: selector(".score").ok_or("Invalid selector: .score")?,
+            type_sel: selector(".typez").ok_or("Invalid selector: .typez")?,
+            season: selector(".season").ok_or("Invalid selector: .season")?,
+            desc: selector(".data .typez").ok_or("Invalid selector: .data .typez")?,
+        })
     }
 }
 
 impl Default for AnimeSelectors {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Valid CSS selectors")
     }
 }
 
 // Global lazy static instance for selectors to avoid reallocation per parse
 use once_cell::sync::Lazy;
-static ANIME_SELECTORS: Lazy<AnimeSelectors> = Lazy::new(|| AnimeSelectors::new());
+static ANIME_SELECTORS: Lazy<Result<AnimeSelectors, String>> = Lazy::new(|| {
+    AnimeSelectors::new().map_err(|e| format!("Failed to create selectors: {}", e))
+});
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -76,7 +78,7 @@ pub fn parse_ongoing_anime(
     html: &str,
 ) -> Result<Vec<OngoingAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -108,7 +110,7 @@ pub fn parse_ongoing_anime_with_score(
     html: &str,
 ) -> Result<Vec<OngoingAnimeItemWithScore>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -139,7 +141,7 @@ pub fn parse_complete_anime(
     html: &str,
 ) -> Result<Vec<CompleteAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -171,7 +173,7 @@ pub fn parse_latest_anime(
     html: &str,
 ) -> Result<Vec<LatestAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -204,7 +206,7 @@ pub fn parse_search_anime(
     html: &str,
 ) -> Result<Vec<SearchAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -244,7 +246,7 @@ pub fn parse_genre_anime(
     html: &str,
 ) -> Result<Vec<GenreAnimeItem>, Box<dyn std::error::Error + Send + Sync>> {
     let document = parse_html(html);
-    let selectors = &*ANIME_SELECTORS;
+    let selectors = ANIME_SELECTORS.as_ref().map_err(|e| e.clone())?;
     let mut items = Vec::new();
 
     for element in document.select(&selectors.item) {
@@ -277,9 +279,9 @@ pub fn parse_genre_anime(
 // ============================================================================
 
 /// Parse pagination from HTML document
-pub fn parse_pagination(document: &Html, current_page: u32) -> Pagination {
-    let pagination_selector = selector(".pagination .page-numbers:not(.next)").unwrap();
-    let next_selector = selector(".pagination .next").unwrap();
+pub fn parse_pagination(document: &Html, current_page: u32) -> Result<Pagination, String> {
+    let pagination_selector = selector(".pagination .page-numbers:not(.next)").ok_or("Invalid selector")?;
+    let next_selector = selector(".pagination .next").ok_or("Invalid selector")?;
 
     let last_visible_page = document
         .select(&pagination_selector)
@@ -301,23 +303,23 @@ pub fn parse_pagination(document: &Html, current_page: u32) -> Pagination {
         None
     };
 
-    Pagination {
+    Ok(Pagination {
         current_page,
         last_visible_page,
         has_next_page,
         next_page,
         has_previous_page,
         previous_page,
-    }
+    })
 }
 
 /// Parse pagination with string-based page numbers (for search results)
 pub fn parse_pagination_with_string(
     document: &Html,
     current_page: u32,
-) -> PaginationWithStringPages {
-    let pagination_selector = selector(".pagination .page-numbers:not(.next)").unwrap();
-    let next_selector = selector(".pagination .next").unwrap();
+) -> Result<PaginationWithStringPages, String> {
+    let pagination_selector = selector(".pagination .page-numbers:not(.next)").ok_or("Invalid selector")?;
+    let next_selector = selector(".pagination .next").ok_or("Invalid selector")?;
 
     let last_visible_page = document
         .select(&pagination_selector)
@@ -345,12 +347,12 @@ pub fn parse_pagination_with_string(
         None
     };
 
-    PaginationWithStringPages {
+    Ok(PaginationWithStringPages {
         current_page,
         last_visible_page,
         has_next_page,
         next_page,
         has_previous_page,
         previous_page,
-    }
+    })
 }

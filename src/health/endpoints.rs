@@ -85,15 +85,24 @@ pub async fn readiness_check() -> impl IntoResponse {
 
 /// Check Redis connectivity using PING command.
 async fn check_redis() -> CheckResult {
-    use crate::infra::redis::REDIS_POOL;
+    use crate::infra::redis::get_redis_pool;
 
     let start = Instant::now();
 
-    match REDIS_POOL.get().await {
-        Ok(mut conn) => {
-            // Execute PING command
-            let result: Result<String, _> = redis::cmd("PING").query_async(&mut *conn).await;
+    let pool = match get_redis_pool() {
+        Ok(p) => p,
+        Err(e) => {
+            return CheckResult {
+                status: "error",
+                latency_ms: Some(start.elapsed().as_millis() as u64),
+                error: Some(format!("Pool error: {}", e)),
+            };
+        }
+    };
 
+    match pool.get().await {
+        Ok(mut conn) => {
+            let result: Result<String, _> = redis::cmd("PING").query_async(&mut *conn).await;
             match result {
                 Ok(response) if response == "PONG" => CheckResult {
                     status: "ok",
@@ -115,7 +124,7 @@ async fn check_redis() -> CheckResult {
         Err(e) => CheckResult {
             status: "error",
             latency_ms: Some(start.elapsed().as_millis() as u64),
-            error: Some(format!("Pool error: {}", e)),
+            error: Some(e.to_string()),
         },
     }
 }

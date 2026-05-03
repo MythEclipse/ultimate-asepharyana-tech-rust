@@ -59,9 +59,9 @@ fn main() {
     println!("Parse Output Evidence:\n");
 
     // Check table structure
-    let table_sel = Selector::parse("table").unwrap();
-    let tr_sel = Selector::parse("tr").unwrap();
-    let td_sel = Selector::parse("td").unwrap();
+    let table_sel = Selector::parse("table").expect("Valid CSS selector");
+    let tr_sel = Selector::parse("tr").expect("Valid CSS selector");
+    let td_sel = Selector::parse("td").expect("Valid CSS selector");
 
     let tables: Vec<_> = document.select(&table_sel).collect();
     println!("  ✓ Tables parsed: {}", tables.len());
@@ -72,8 +72,7 @@ fn main() {
     let tds: Vec<_> = document.select(&td_sel).collect();
     println!("  ✓ Table cells found: {}", tds.len());
 
-    // Extract text from body to show foster parenting occurred
-    let body_sel = Selector::parse("body").unwrap();
+    let body_sel = Selector::parse("body").expect("Valid CSS selector");
     if let Some(body) = document.select(&body_sel).next() {
         let body_text: String = body.text().collect();
         let trimmed = body_text.trim();

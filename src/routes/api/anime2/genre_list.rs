@@ -122,5 +122,5 @@ fn parse_genres(html: &str) -> Result<Vec<Genre>, Box<dyn std::error::Error + Se
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/genre_list", axum::routing::get(genres))
+    router.route("/api/anime2/genre_list.rs", axum::routing::get(genres))
 }

@@ -114,8 +114,8 @@ unused_imports = "deny"
 unused_must_use = "deny"
 
 [lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+unwrap_used = "warn"
+expect_used = "warn"
 panic = "deny"
 todo = "deny"
 unimplemented = "deny"

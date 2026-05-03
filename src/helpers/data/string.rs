@@ -3,20 +3,33 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-/// Slugify a string (lowercase, hyphens, no special chars).
 pub fn slugify(s: &str) -> String {
-    static RE_SPECIAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-z0-9\s-]").unwrap());
-    static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"[\s_]+").unwrap());
-    static RE_HYPHENS: Lazy<Regex> = Lazy::new(|| Regex::new(r"-+").unwrap());
+    static RE_SPECIAL: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"[^a-z0-9\s-]")
+    });
+    static RE_SPACES: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"[\s_]+")
+    });
+    static RE_HYPHENS: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"-+")
+    });
 
     let s = s.to_lowercase();
-    let s = RE_SPECIAL.replace_all(&s, "");
-    let s = RE_SPACES.replace_all(&s, "-");
-    let s = RE_HYPHENS.replace_all(&s, "-");
+    let s = RE_SPECIAL
+        .as_ref()
+        .map(|r| r.replace_all(&s, "").to_string())
+        .unwrap_or(s);
+    let s = RE_SPACES
+        .as_ref()
+        .map(|r| r.replace_all(&s, "-").to_string())
+        .unwrap_or(s);
+    let s = RE_HYPHENS
+        .as_ref()
+        .map(|r| r.replace_all(&s, "-").to_string())
+        .unwrap_or(s);
     s.trim_matches('-').to_string()
 }
 
-/// Truncate string to max length with ellipsis.
 pub fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
@@ -27,7 +40,6 @@ pub fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
-/// Extract initials from a name.
 pub fn initials(name: &str) -> String {
     name.split_whitespace()
         .filter_map(|word| word.chars().next())
@@ -36,7 +48,6 @@ pub fn initials(name: &str) -> String {
         .to_uppercase()
 }
 
-/// Mask sensitive data (e.g., email).
 pub fn mask_email(email: &str) -> String {
     if let Some(at_pos) = email.find('@') {
         let (local, domain) = email.split_at(at_pos);
@@ -51,7 +62,6 @@ pub fn mask_email(email: &str) -> String {
     }
 }
 
-/// Generate a random string.
 pub fn random_string(len: usize) -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -64,7 +74,6 @@ pub fn random_string(len: usize) -> String {
         .collect()
 }
 
-/// Generate a random alphanumeric code (for verification, etc.).
 pub fn random_code(len: usize) -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -77,14 +86,15 @@ pub fn random_code(len: usize) -> String {
         .collect()
 }
 
-/// Check if string is a valid email format.
 pub fn is_valid_email(email: &str) -> bool {
-    static RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap());
-    RE.is_match(email)
+    static RE: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    });
+    RE.as_ref()
+        .map(|r| r.is_match(email))
+        .unwrap_or(false)
 }
 
-/// Convert string to title case.
 pub fn title_case(s: &str) -> String {
     s.split_whitespace()
         .map(|word| {

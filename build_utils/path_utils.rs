@@ -1,4 +1,4 @@
-use crate::build_utils::constants::DYNAMIC_REGEX;
+use crate::build_utils::constants::get_dynamic_regex;
 
 pub fn generate_default_description(path_str: &str, method: &str) -> String {
     let path_segments: Vec<&str> = path_str.trim_matches('/').split('/').collect();
@@ -51,7 +51,7 @@ pub fn generate_default_description(path_str: &str, method: &str) -> String {
 
 pub fn sanitize_operation_id(path_str: &str) -> String {
     let s = path_str.replace([std::path::MAIN_SEPARATOR, '-'], "_");
-    let s = DYNAMIC_REGEX
+    let s = get_dynamic_regex()
         .replace_all(&s, |caps: &regex::Captures| {
             let inner = &caps[1];
             if inner.starts_with("...") {
@@ -65,13 +65,12 @@ pub fn sanitize_operation_id(path_str: &str) -> String {
 }
 
 pub fn sanitize_tag(path_str: &str) -> String {
-    // Only take the first part of the path before any separator
     let first_part = path_str
         .split(std::path::MAIN_SEPARATOR)
         .next()
         .unwrap_or("");
     let s = first_part.replace('-', "_");
-    let s = DYNAMIC_REGEX
+    let s = get_dynamic_regex()
         .replace_all(&s, |caps: &regex::Captures| {
             let inner = &caps[1];
             if inner.starts_with("...") {

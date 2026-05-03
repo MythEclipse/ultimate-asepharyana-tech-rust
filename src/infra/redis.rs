@@ -8,14 +8,10 @@ use deadpool_redis::{Manager, Pool};
 use once_cell::sync::Lazy;
 use tracing::{debug, error, info};
 
-/// Create a lazy static Redis connection pool.
-/// Uses REDIS_URL from config, or falls back to constructing from host/port.
-pub static REDIS_POOL: Lazy<Pool> = Lazy::new(|| {
-    // Use redis_url if available, otherwise construct from environment
+static REDIS_POOL_INIT: Lazy<Result<Pool, String>> = Lazy::new(|| {
     let redis_url = if !CONFIG.redis_url.is_empty() {
         CONFIG.redis_url.clone()
     } else {
-        // Fallback to legacy env vars for backward compatibility
         let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let port = std::env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
         let password = std::env::var("REDIS_PASSWORD").unwrap_or_default();
@@ -29,21 +25,36 @@ pub static REDIS_POOL: Lazy<Pool> = Lazy::new(|| {
 
     info!("Initializing Redis connection pool for URL: {}", redis_url);
 
-    Pool::builder(Manager::new(redis_url).expect("Failed to create Redis manager"))
-        .max_size(100)  // Increased from 50 for high-traffic
-        .wait_timeout(Some(std::time::Duration::from_millis(200))) // Aggressive fail-fast timeout
-        .runtime(deadpool_redis::Runtime::Tokio1)
-        .build()
-        .expect("Failed to create Redis connection pool")
+    Manager::new(redis_url)
+        .map_err(|e| format!("Failed to create Redis manager: {}", e))
+        .and_then(|manager| {
+            Pool::builder(manager)
+                .max_size(100)
+                .wait_timeout(Some(std::time::Duration::from_millis(200)))
+                .runtime(deadpool_redis::Runtime::Tokio1)
+                .build()
+                .map_err(|e| format!("Failed to create Redis connection pool: {}", e))
+        })
 });
+
+/// Get the Redis connection pool (for internal use).
+pub fn get_redis_pool() -> Result<&'static Pool, String> {
+    REDIS_POOL_INIT.as_ref().map_err(|e| e.clone())
+}
+
+/// Get a cloned reference to the Redis pool.
+pub fn redis_pool() -> Result<Pool, String> {
+    get_redis_pool().map(|p| (*p).clone())
+}
 
 /// Get an async connection from the pool with retry backoff.
 pub async fn get_redis_conn() -> Result<deadpool_redis::Connection, AppError> {
+    let pool = get_redis_pool().map_err(|e| AppError::Other(e))?;
     let mut retries = 5;
     let mut wait = std::time::Duration::from_millis(100);
 
     loop {
-        match REDIS_POOL.get().await {
+        match pool.get().await {
             Ok(conn) => {
                 debug!("Successfully retrieved Redis connection from pool.");
                 return Ok(conn);

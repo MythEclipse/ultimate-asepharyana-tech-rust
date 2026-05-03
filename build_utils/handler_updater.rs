@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use crate::build_utils::constants::{DYNAMIC_REGEX, ENDPOINT_METADATA_REGEX, HANDLER_FN_REGEX};
+use crate::build_utils::constants::{get_dynamic_regex, get_endpoint_metadata_regex, get_handler_fn_regex};
 use crate::build_utils::handler_template::generate_handler_template;
 use crate::build_utils::path_utils::{
     generate_default_description, sanitize_operation_id, sanitize_tag,
@@ -39,7 +39,7 @@ pub fn update_handler_file(
     // Simplified extraction: just find the main handler function
     let metadata_map = extract_and_normalize_metadata(&content, path, root_api_path, &file_stem, doc_comment)?;
     
-    let func_name = HANDLER_FN_REGEX
+    let func_name = get_handler_fn_regex()
         .captures(&content)
         .map(|c| c[1].to_string())
         .unwrap_or_else(|| file_stem.to_string());
@@ -121,13 +121,13 @@ fn generate_and_update_register_routes(
     let method = metadata.get("ENDPOINT_METHOD").cloned().unwrap_or_else(|| "get".to_string());
     let path = metadata.get("ENDPOINT_PATH").cloned().unwrap_or_else(|| "/".to_string());
     
-    let func_name = HANDLER_FN_REGEX
+    let func_name = get_handler_fn_regex()
         .captures(content)
         .map(|c| c[1].to_string())
         .unwrap_or_else(|| _file_stem.to_string());
 
     // Standardize path for Axum: replace [param] with {param} (Axum 0.8+)
-    let axum_path = DYNAMIC_REGEX.replace_all(&path, "{$1}").to_string();
+    let axum_path = get_dynamic_regex().replace_all(&path, "{$1}").to_string();
 
     let route_call = format!(".route(\"{}\", axum::routing::{}({}))", axum_path, method, func_name);
     let new_register_fn = format!(
@@ -168,12 +168,12 @@ fn extract_and_normalize_metadata(
 ) -> Result<HashMap<String, String>> {
     let mut metadata = HashMap::new();
 
-    for cap in ENDPOINT_METADATA_REGEX.captures_iter(content) {
+    for cap in get_endpoint_metadata_regex().captures_iter(content) {
         metadata.insert(cap[1].to_string(), cap[2].to_string());
     }
 
-    let relative_path_no_ext = path.strip_prefix(root_api_path).unwrap().with_extension("");
-    let relative_path_str = relative_path_no_ext.to_str().unwrap();
+    let relative_path_no_ext = path.strip_prefix(root_api_path).expect("Valid path");
+    let relative_path_str = relative_path_no_ext.to_str().expect("Valid string");
 
     let default_tag = sanitize_tag(relative_path_str);
     metadata.entry("ENDPOINT_TAG".to_string()).or_insert(if default_tag.is_empty() { "api".to_string() } else { default_tag });
@@ -262,7 +262,7 @@ fn inject_openapi_metadata(
     }
 
     // Standardize path for Utoipa: replace [param] with {param}
-    let utoipa_path = DYNAMIC_REGEX.replace_all(&path, "{$1}").to_string();
+    let utoipa_path = get_dynamic_regex().replace_all(&path, "{$1}").to_string();
 
     let utoipa_macro = format!(
         r#"#[utoipa::path(

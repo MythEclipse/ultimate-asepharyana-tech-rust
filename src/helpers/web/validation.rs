@@ -3,50 +3,44 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-/// Email validation regex.
-static EMAIL_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap());
-
-/// URL validation regex.
-static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://[^\s/$.?#].[^\s]*$").unwrap());
-
-/// Phone validation regex (international format).
-static PHONE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\+?[1-9]\d{1,14}$").unwrap());
-
-/// UUID v4 validation regex.
-static UUID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-    )
-    .unwrap()
+static EMAIL_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+    Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 });
 
-/// Slug validation regex (lowercase, hyphens, no spaces).
-static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap());
+static URL_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+    Regex::new(r"^https?://[^\s/$.?#].[^\s]*$")
+});
 
-/// Validate email format.
+static PHONE_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+    Regex::new(r"^\+?[1-9]\d{1,14}$")
+});
+
+static UUID_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+    Regex::new(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+});
+
+static SLUG_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+    Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+});
+
 pub fn is_email(s: &str) -> bool {
-    EMAIL_REGEX.is_match(s)
+    EMAIL_REGEX.as_ref().map(|r| r.is_match(s)).unwrap_or(false)
 }
 
-/// Validate URL format.
 pub fn is_url(s: &str) -> bool {
-    URL_REGEX.is_match(s)
+    URL_REGEX.as_ref().map(|r| r.is_match(s)).unwrap_or(false)
 }
 
-/// Validate phone number format.
 pub fn is_phone(s: &str) -> bool {
-    PHONE_REGEX.is_match(s)
+    PHONE_REGEX.as_ref().map(|r| r.is_match(s)).unwrap_or(false)
 }
 
-/// Validate UUID v4 format.
 pub fn is_uuid(s: &str) -> bool {
-    UUID_REGEX.is_match(s)
+    UUID_REGEX.as_ref().map(|r| r.is_match(s)).unwrap_or(false)
 }
 
-/// Validate slug format.
 pub fn is_slug(s: &str) -> bool {
-    SLUG_REGEX.is_match(s)
+    SLUG_REGEX.as_ref().map(|r| r.is_match(s)).unwrap_or(false)
 }
 
 /// Check if string is not empty.

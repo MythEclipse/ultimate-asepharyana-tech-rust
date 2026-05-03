@@ -9,7 +9,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
 
 use crate::core::config::CONFIG;
-use crate::infra::redis::REDIS_POOL;
+use crate::infra::redis::get_redis_conn;
 use crate::routes::AppState;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -46,7 +46,7 @@ impl Application {
         );
 
         // Redis
-        let _ = REDIS_POOL.get().await;
+        let _ = get_redis_conn().await;
 
         // Browser Pool
         tracing::info!("Initializing browser pool...");
@@ -92,10 +92,12 @@ impl Application {
             Arc::new(tokio::sync::Semaphore::new(CONFIG.image_processing_concurrency));
         let event_bus = Arc::new(crate::events::bus::EventBus::new());
 
-        let app_state = Arc::new(AppState {
-            redis_pool: REDIS_POOL.clone(),
-            db: db_arc.clone(),
+        let redis_pool = crate::infra::redis::redis_pool()
+            .map_err(|e| anyhow::anyhow!("Failed to init Redis pool: {}", e))?;
 
+        let app_state = Arc::new(AppState {
+            redis_pool,
+            db: db_arc.clone(),
             image_processing_semaphore,
             event_bus: event_bus.clone(),
         });

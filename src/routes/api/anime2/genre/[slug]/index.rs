@@ -295,11 +295,11 @@ fn parse_genre_page(
     let anime_list = parsers::parse_genre_anime(html)?;
 
     // Parse pagination using shared parser
-    let pagination = parsers::parse_pagination(&document, current_page);
+    let pagination = parsers::parse_pagination(&document, current_page)?;
 
     Ok((anime_list, pagination))
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/genre/{slug}", axum::routing::get(slug))
+    router.route("/api/anime2/genre/{slug}/index.rs", axum::routing::get(slug))
 }

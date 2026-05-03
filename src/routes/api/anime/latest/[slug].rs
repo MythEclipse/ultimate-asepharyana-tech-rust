@@ -246,5 +246,5 @@ fn parse_latest_page(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime/latest/{slug}", axum::routing::get(latest))
+    router.route("/api/anime/latest/{slug}.rs", axum::routing::get(latest))
 }

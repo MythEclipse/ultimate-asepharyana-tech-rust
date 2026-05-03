@@ -104,10 +104,14 @@ pub fn select_all<'a>(document: &'a Html, css: &str) -> Vec<ElementRef<'a>> {
 
 /// Extract slug from URL (last path segment).
 pub fn extract_slug(url: &str) -> String {
-    static SLUG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/([^/]+)/?$").unwrap());
+    static SLUG_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"/([^/]+)/?$")
+    });
 
     SLUG_REGEX
-        .captures(url)
+        .as_ref()
+        .ok()
+        .and_then(|r| r.captures(url))
         .and_then(|cap| cap.get(1))
         .map(|m| m.as_str().to_string())
         .unwrap_or_default()
@@ -115,21 +119,36 @@ pub fn extract_slug(url: &str) -> String {
 
 /// Remove HTML tags from string.
 pub fn strip_tags(html: &str) -> String {
-    static TAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]+>").unwrap());
-    TAG_REGEX.replace_all(html, "").trim().to_string()
+    static TAG_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"<[^>]+>")
+    });
+    TAG_REGEX
+        .as_ref()
+        .map(|r| r.replace_all(html, "").trim().to_string())
+        .unwrap_or_else(|_| html.to_string())
 }
 
 /// Extract number from text.
 pub fn extract_number(text: &str) -> Option<i64> {
-    static NUM_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\d+").unwrap());
-    NUM_REGEX.find(text).and_then(|m| m.as_str().parse().ok())
+    static NUM_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"\d+")
+    });
+    NUM_REGEX
+        .as_ref()
+        .ok()
+        .and_then(|r| r.find(text))
+        .and_then(|m| m.as_str().parse().ok())
 }
 
 /// Extract text inside parentheses.
 pub fn extract_parentheses(text: &str) -> Option<String> {
-    static PAREN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\(([^)]+)\)").unwrap());
+    static PAREN_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::new(|| {
+        Regex::new(r"\(([^)]+)\)")
+    });
     PAREN_REGEX
-        .captures(text)
+        .as_ref()
+        .ok()
+        .and_then(|r| r.captures(text))
         .and_then(|cap| cap.get(1))
         .map(|m| m.as_str().to_string())
 }

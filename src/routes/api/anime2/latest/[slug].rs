@@ -127,11 +127,11 @@ fn parse_latest_page(
     let anime_list = parsers::parse_latest_anime(html)?;
 
     // Use shared parser for pagination
-    let pagination = parsers::parse_pagination(&document, current_page);
+    let pagination = parsers::parse_pagination(&document, current_page)?;
 
     Ok((anime_list, pagination))
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime2/latest/{slug}", axum::routing::get(latest))
+    router.route("/api/anime2/latest/{slug}.rs", axum::routing::get(latest))
 }

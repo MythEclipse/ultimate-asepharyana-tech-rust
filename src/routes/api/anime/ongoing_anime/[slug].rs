@@ -235,5 +235,5 @@ fn parse_ongoing_anime_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime/ongoing_anime/{slug}", axum::routing::get(slug))
+    router.route("/api/anime/ongoing_anime/{slug}.rs", axum::routing::get(slug))
 }
