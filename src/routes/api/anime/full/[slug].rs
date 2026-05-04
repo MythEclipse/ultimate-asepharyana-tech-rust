@@ -290,5 +290,5 @@ fn parse_anime_full_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime/full/{slug}.rs", axum::routing::get(slug))
+    router.route("/api/anime/full/{slug}", axum::routing::get(slug))
 }

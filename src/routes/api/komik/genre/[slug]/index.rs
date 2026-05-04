@@ -302,5 +302,5 @@ fn parse_genre_page(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/komik/genre/{slug}/index.rs", axum::routing::get(slug))
+    router.route("/api/komik/genre/{slug}", axum::routing::get(slug))
 }

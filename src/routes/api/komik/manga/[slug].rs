@@ -300,5 +300,5 @@ fn parse_manga_list_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/komik/manga/{slug}.rs", axum::routing::get(index))
+    router.route("/api/komik/manga/{slug}", axum::routing::get(index))
 }

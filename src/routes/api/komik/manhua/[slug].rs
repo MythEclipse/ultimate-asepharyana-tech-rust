@@ -296,5 +296,5 @@ fn parse_manhua_list_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/komik/manhua/{slug}.rs", axum::routing::get(index))
+    router.route("/api/komik/manhua/{slug}", axum::routing::get(index))
 }

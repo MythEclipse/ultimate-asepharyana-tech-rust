@@ -281,5 +281,5 @@ fn parse_komik_chapter_document(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/komik/chapter/{slug}.rs", axum::routing::get(slug))
+    router.route("/api/komik/chapter/{slug}", axum::routing::get(slug))
 }
