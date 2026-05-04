@@ -182,7 +182,7 @@ fn extract_and_normalize_metadata(
     metadata.entry("OPERATION_ID".to_string()).or_insert(operation_id);
     metadata.entry("ENDPOINT_METHOD".to_string()).or_insert("get".to_string());
 
-    let default_route_path = relative_path_no_ext.to_str().unwrap().replace("\\", "/");
+    let default_route_path = relative_path_no_ext.with_extension("").to_str().unwrap().replace("\\", "/");
     let mut route_path = metadata.entry("ENDPOINT_PATH".to_string()).or_insert(default_route_path).clone();
 
     if file_stem == "index" && route_path.ends_with("/index") {
