@@ -1,5 +1,5 @@
 use crate::core::models::anime::HasPoster;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use std::sync::Arc;
 
 /// Cache poster URLs for a collection of anime items

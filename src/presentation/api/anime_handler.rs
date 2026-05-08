@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::{Json, Router};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::core::use_cases::CacheImageUseCase;
 use crate::infra::repositories::mysql_image_repository::MySqlImageRepository;
 use crate::shared::errors::AppError;
@@ -190,6 +190,6 @@ fn parse_complete_anime(
     Ok(complete_anime)
 }
 
-pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/api/anime", axum::routing::get(anime_index))
+pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
+    router.route("/api/anime_handler", axum::routing::get(anime_index))
 }

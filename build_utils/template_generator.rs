@@ -97,7 +97,7 @@ pub fn generate_template_content(
 
     {}
     use std::sync::Arc;
-    use crate::routes::AppState;
+    use crate::presentation::state::AppState;
     use serde::{{Deserialize, Serialize}};
     use serde_json;
     use utoipa::ToSchema;

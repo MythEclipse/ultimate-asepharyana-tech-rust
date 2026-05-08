@@ -4,43 +4,22 @@
 // ============================================================================
 // Core Framework
 // ============================================================================
-pub mod core; // config, error, ratelimit
-pub mod shared; // errors, utils
+pub mod core;
+pub mod shared;
+pub mod infra;
+pub mod presentation;
 
-// ============================================================================
-// Infrastructure
-// ============================================================================
-pub mod infra; // redis, http_client, proxy, image_proxy
-pub mod presentation; // API Handlers, DTOs
+pub mod browser;
+pub mod events;
+pub mod graceful;
+pub mod health;
+pub mod jobs;
+pub mod middleware;
+pub mod observability;
+pub mod scheduler;
+pub mod scraping;
 
-// ============================================================================
-// Features
-// ============================================================================
-pub mod browser; // Browser tab pooling for scraping
-pub mod events; // Event bus (pub/sub)
-pub mod graceful; // Graceful shutdown with signals
-pub mod health; // Health check endpoints
-pub mod jobs; // Background job processing
-pub mod middleware; // logging, request_id, cors, compression middleware
-pub mod observability; // request ID, tracing
-pub mod scheduler; // Cron jobs
-
-// ============================================================================
-// Data Layer (Legacy - Prefer src/core)
-// ============================================================================
-// pub mod entities; // SeaORM entities
-// pub mod models; // Data models + types
-// pub mod services; // Domain services
-
-// ============================================================================
-// Application-Specific (Scraping)
-// ============================================================================
-pub mod scraping; // URLs, CDN, base URLs
-
-// ============================================================================
-// Build & Routes
-// ============================================================================
 #[path = "../build_utils/mod.rs"]
 pub mod build_utils;
-pub mod routes;
 pub mod bootstrap;
+

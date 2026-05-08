@@ -253,26 +253,3 @@ pub static MINIO_CONFIG: Lazy<Option<MinioConfig>> = Lazy::new(|| {
     MinioConfig::from_env()
 });
 
-// ============================================================================
-// Legacy compatibility layer
-// ============================================================================
-
-use std::collections::HashMap;
-
-/// Legacy CONFIG_MAP for backward compatibility.
-/// New code should use `CONFIG` directly.
-#[deprecated(note = "Use CONFIG struct directly for type safety")]
-pub static CONFIG_MAP: Lazy<HashMap<String, String>> = Lazy::new(|| {
-    // Load .env
-    let _ = dotenvy::dotenv();
-
-    let mut map = HashMap::new();
-    for (key, value) in env::vars() {
-        // Skip variables with control characters
-        if value.contains('\r') || value.contains('\n') || value.contains('\x1b') {
-            continue;
-        }
-        map.insert(key, value);
-    }
-    map
-});

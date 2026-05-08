@@ -55,7 +55,7 @@ fn generate_list_handler(resource: &str, model: &str) -> String {
 use axum::{{Extension, Json, response::IntoResponse, Router}};
 use sea_orm::{{DatabaseConnection, EntityTrait}};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::entities::{model_low}::{{Entity as {model}, Model}};
 
 pub async fn list(
@@ -88,7 +88,7 @@ fn generate_show_handler(resource: &str, model: &str) -> String {
 use axum::{{Extension, Json, extract::Path, response::IntoResponse, Router}};
 use sea_orm::{{DatabaseConnection, EntityTrait}};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::entities::{model_low}::{{Entity as {model}, Model}};
 
 pub async fn show(
@@ -125,7 +125,7 @@ use axum::{{Extension, Json, response::IntoResponse, Router}};
 use sea_orm::{{ActiveModelTrait, DatabaseConnection, Set}};
 use serde::{{Deserialize, Serialize}};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::entities::{model_low}::{{ActiveModel, Model}};
 
 #[derive(Serialize, Deserialize)]
@@ -172,7 +172,7 @@ use axum::{{Extension, Json, extract::Path, response::IntoResponse, Router}};
 use sea_orm::{{ActiveModelTrait, DatabaseConnection, EntityTrait, Set}};
 use serde::{{Deserialize, Serialize}};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::entities::{model_low}::{{ActiveModel, Entity as {model}, Model}};
 
 #[derive(Serialize, Deserialize)]
@@ -228,7 +228,7 @@ fn generate_delete_handler(resource: &str, model: &str) -> String {
 use axum::{{Extension, extract::Path, response::IntoResponse, Router}};
 use sea_orm::{{ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel}};
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use crate::entities::{model_low}::{{Entity as {model}}};
 
 pub async fn destroy(
@@ -270,7 +270,7 @@ fn generate_basic_controller(api_dir: &Path, resource: &str) {
 
 use axum::Router;
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 
 pub async fn index() -> &'static str {{
     "{resource} endpoint"

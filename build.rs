@@ -36,7 +36,7 @@ impl BuildConfig {
             PathBuf::from(env::var("CARGO_MANIFEST_DIR").context("CARGO_MANIFEST_DIR not set")?);
 
         Ok(Self {
-            api_routes_path: "src/routes/api".into(),
+            api_routes_path: "src/presentation/api".into(),
             build_utils_path: "build_utils/".into(),
             enable_logging: env::var("VERBOSE").is_ok(),
             project_root,

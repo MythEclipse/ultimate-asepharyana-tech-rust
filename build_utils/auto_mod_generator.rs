@@ -130,7 +130,7 @@ fn generate_mod_for_directory_auto(
 /// Register routes for this directory
 use axum::Router;
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {{
     {}
@@ -178,7 +178,7 @@ fn compute_module_path_prefix(current_dir: &Path, root_api_path: &Path) -> Resul
         .replace('-', "_");
 
     let module_path_prefix = if relative_path_str.is_empty() {
-        "crate::routes::api".to_string()
+        "crate::presentation::api".to_string()
     } else {
         let sanitized_segments: Vec<String> = relative_path_str
             .split("::")
@@ -190,7 +190,7 @@ fn compute_module_path_prefix(current_dir: &Path, root_api_path: &Path) -> Resul
             .filter(|s| !s.is_empty())
             .collect();
 
-        format!("crate::routes::api::{}", sanitized_segments.join("::"))
+        format!("crate::presentation::api::{}", sanitized_segments.join("::"))
     };
 
     Ok(module_path_prefix)

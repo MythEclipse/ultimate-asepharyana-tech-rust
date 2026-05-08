@@ -10,7 +10,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::core::config::CONFIG;
 use crate::infra::redis::get_redis_conn;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use crate::observability::openapi::ApiDoc;
@@ -113,8 +113,7 @@ impl Application {
         openapi.merge(crate::observability::openapi_generated::GeneratedApiDoc::openapi());
 
         // Router
-        let app = crate::routes::api::register_routes(Router::new())
-            .merge(crate::presentation::api::anime_handler::router())
+        let app = crate::presentation::api::register_routes(Router::new())
             .route("/metrics", axum::routing::get(move || async move { metric_handle.render() }))
             .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", openapi))
             .with_state(app_state.clone())

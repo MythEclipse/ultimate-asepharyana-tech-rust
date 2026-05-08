@@ -149,8 +149,10 @@ impl CleanupOldCache {
                     .map_err(|e| format!("Failed to scan keys: {}", e))?;
 
                 let mut keys = Vec::new();
-                while let Some(key) = iter.next_item().await {
-                    keys.push(key);
+                while let Some(key_result) = iter.next_item().await {
+                    if let Ok(key) = key_result {
+                        keys.push(key);
+                    }
                 }
 
                 keys

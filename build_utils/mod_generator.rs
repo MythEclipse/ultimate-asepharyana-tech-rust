@@ -140,7 +140,7 @@ fn generate_mod_content(pub_mods: &[String], body: &str) -> String {
 /// Register routes for this directory
 use axum::Router;
 use std::sync::Arc;
-use crate::routes::AppState;
+use crate::presentation::state::AppState;
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {{
   {}
 }}

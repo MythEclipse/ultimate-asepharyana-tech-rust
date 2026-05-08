@@ -1,0 +1,62 @@
+use axum::Router;
+use std::sync::Arc;
+use crate::presentation::state::AppState;
+use axum::{
+    extract::{Query, State},
+    response::Response};
+use http::StatusCode;
+use serde::Deserialize;
+use utoipa::{ToSchema, IntoParams};
+
+use crate::infra::proxy::fetch_with_proxy;
+use crate::core::error::AppError;
+
+
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+pub struct ProxyParams {
+    /// URL to fetch via proxy
+    pub url: String,
+}
+
+/// Handles GET requests for the proxy endpoint.
+#[utoipa::path(
+    get,
+    path = "/api/proxy/croxy",
+    tag = "proxy",
+    operation_id = "proxy_croxy",
+    params(
+        ProxyParams
+    ),
+    responses(
+        (status = 200, description = "Handles GET requests for the /api/proxy/croxy endpoint.", body = serde_json::Value),
+        (status = 500, description = "Internal Server Error", body = String)
+    )
+)]
+pub async fn fetch_with_proxy_only(
+    _: State<Arc<AppState>>,
+    Query(params): Query<ProxyParams>,
+) -> Result<Response, AppError> {
+    let slug = params.url;
+    match fetch_with_proxy(&slug).await {
+        Ok(fetch_result) => {
+            let mut response_builder = Response::builder().status(StatusCode::OK);
+
+            if let Some(content_type) = fetch_result.content_type {
+                response_builder = response_builder.header("Content-Type", content_type);
+            }
+
+            Ok(response_builder.body(fetch_result.data.into())?)
+        }
+        Err(e) => {
+            eprintln!("Proxy fetch error: {:?}", e);
+            Err(AppError::Other(format!(
+                "Failed to fetch URL via proxy: {}",
+                e
+            )))
+        }
+    }
+}
+
+pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
+    router.route("/api/proxy/croxy", axum::routing::get(fetch_with_proxy_only))
+}
