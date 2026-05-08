@@ -15,7 +15,7 @@ use tracing::info;
 // Internal imports
 
 // Import shared models and parsers
-use crate::models::anime2::{CompleteAnimeItem, Pagination};
+use crate::core::models::anime::{CompleteAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 
 

@@ -1,6 +1,4 @@
 //! Data models and types.
 
-pub mod anime2;
-pub mod types;
-
-pub use types::*;
+pub use crate::core::models::anime::*;
+pub use crate::core::models::types::*;

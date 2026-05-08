@@ -4,7 +4,7 @@ use crate::routes::AppState;
 use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
 use crate::shared::utils::{default_backoff, transient, Cache};
 use crate::infra::proxy::fetch_with_proxy;
-use crate::models::anime2::{FilterAnimeItem, Pagination};
+use crate::core::models::anime::{FilterAnimeItem, Pagination};
 use axum::extract::{Query, State};
 use backoff::future::retry;
 use once_cell::sync::Lazy;

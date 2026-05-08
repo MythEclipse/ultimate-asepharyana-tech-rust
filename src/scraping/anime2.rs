@@ -2,7 +2,7 @@ use crate::shared::utils::parse_html;
 use crate::shared::utils::scraping::{
     attr, attr_from, attr_from_or, extract_slug, selector, text, text_from_or,
 };
-use crate::models::anime2::*;
+use crate::core::models::anime::*;
 use scraper::{Html, Selector};
 
 // ============================================================================

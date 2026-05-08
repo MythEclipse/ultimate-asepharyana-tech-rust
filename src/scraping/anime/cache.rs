@@ -1,4 +1,4 @@
-use crate::models::anime2::HasPoster;
+use crate::core::models::anime::HasPoster;
 use crate::routes::AppState;
 use std::sync::Arc;
 

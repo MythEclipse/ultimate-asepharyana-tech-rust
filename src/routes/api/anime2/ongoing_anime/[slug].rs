@@ -10,7 +10,7 @@ use serde_json::json;
 use tracing::info;
 
 // Import shared models and parsers
-use crate::models::anime2::{OngoingAnimeItemWithScore, Pagination};
+use crate::core::models::anime::{OngoingAnimeItemWithScore, Pagination};
 use crate::scraping::anime2 as parsers;
 
 

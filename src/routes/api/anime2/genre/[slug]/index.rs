@@ -11,7 +11,7 @@ use serde_json::json;
 use tracing::info;
 
 // Import shared models and parsers
-use crate::models::anime2::{GenreAnimeItem, Pagination};
+use crate::core::models::anime::{GenreAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 
 

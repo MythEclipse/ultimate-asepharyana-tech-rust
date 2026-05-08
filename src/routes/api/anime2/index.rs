@@ -11,7 +11,7 @@ use utoipa::ToSchema;
 use tracing::info;
 
 // Import shared models and parsers
-use crate::models::anime2::{OngoingAnimeItem, CompleteAnimeItem};
+use crate::core::models::anime::{OngoingAnimeItem, CompleteAnimeItem};
 use crate::scraping::anime2 as parsers;
 use crate::scraping::anime::cache as cache_utils;
 
