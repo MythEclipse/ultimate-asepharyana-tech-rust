@@ -5,7 +5,7 @@ use sea_orm::*;
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::entities::image_cache;
+use crate::infra::persistence::entities::image_cache;
 use crate::shared::utils::cache::Cache;
 use crate::infra::redis::get_redis_pool;
 

@@ -3,7 +3,7 @@
 //! This module provides utilities to cache images via jsDelivr CDN
 //! with database storage for URL mapping.
 
-use crate::entities::image_cache;
+use crate::infra::persistence::entities::image_cache;
 use chrono::Utc;
 use deadpool_redis::Pool as RedisPool;
 use reqwest::Client;

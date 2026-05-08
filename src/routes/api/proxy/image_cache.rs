@@ -8,7 +8,7 @@ use axum::{extract::State, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::services::images::cache::ImageCache;
+use crate::core::services::images::cache::ImageCache;
 use crate::events::bus::ImageRepaired;
 
 pub const ENDPOINT_METHOD: &str = "post";

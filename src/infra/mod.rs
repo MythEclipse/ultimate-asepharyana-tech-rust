@@ -1,5 +1,6 @@
 //! Infrastructure utilities - Redis, HTTP clients, proxies.
 
+pub mod persistence;
 pub mod db_setup;
 pub mod http_client;
 pub mod image_proxy;

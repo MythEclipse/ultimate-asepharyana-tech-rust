@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sea_orm::*;
 use crate::core::models::image::ImageCache as DomainImageCache;
 use crate::core::repositories::image_repository::ImageRepository;
-use crate::entities::image_cache::{Entity as ImageCacheEntity, ActiveModel as ImageCacheActiveModel, Column};
+use crate::infra::persistence::entities::image_cache::{Entity as ImageCacheEntity, ActiveModel as ImageCacheActiveModel, Column};
 use crate::shared::errors::AppError;
 
 use std::sync::Arc;

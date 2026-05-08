@@ -28,10 +28,9 @@ pub mod scheduler; // Cron jobs
 // ============================================================================
 // Data Layer (Legacy - Prefer src/core)
 // ============================================================================
-#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
-pub mod entities; // SeaORM entities
-pub mod models; // Data models + types
-pub mod services; // Domain services
+// pub mod entities; // SeaORM entities
+// pub mod models; // Data models + types
+// pub mod services; // Domain services
 
 // ============================================================================
 // Application-Specific (Scraping)

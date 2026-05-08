@@ -1,6 +1,6 @@
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, Schema};
 use tracing::{info, error};
-use crate::entities::image_cache;
+use crate::infra::persistence::entities::image_cache;
 
 pub async fn init(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     info!("🚀 Initializing database schema...");

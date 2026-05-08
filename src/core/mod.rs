@@ -9,6 +9,7 @@ pub mod ratelimit;
 pub mod models;
 pub mod repositories;
 pub mod use_cases;
+pub mod services;
 
 pub use config::CONFIG;
 

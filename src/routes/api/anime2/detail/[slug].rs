@@ -2,7 +2,7 @@ use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
 use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::services::images::cache::{get_cached_or_original, cache_image_urls_batch_lazy};
+use crate::core::services::images::cache::{get_cached_or_original, cache_image_urls_batch_lazy};
 use crate::shared::utils::scraping::{selector, text_from_or, extract_slug, text, attr};
 use axum::extract::State;
 use axum::http::StatusCode;
