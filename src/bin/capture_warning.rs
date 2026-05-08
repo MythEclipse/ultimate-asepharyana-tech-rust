@@ -12,7 +12,7 @@
 use std::fs;
 use scraper::Selector;
 use tracing_subscriber::EnvFilter;
-use rustexpress::helpers::parse_html;
+use rustexpress::shared::utils::parse_html;
 
 fn main() {
     // Initialize logging to capture WARN output from html5ever

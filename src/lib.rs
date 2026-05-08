@@ -30,9 +30,7 @@ pub mod scheduler; // Cron jobs
 // ============================================================================
 #[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod entities; // SeaORM entities
-#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod models; // Data models + types
-#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod services; // Domain services
 
 // ============================================================================

@@ -7,7 +7,7 @@
 /// Uses shared parser: src/helpers::parse_html()
 
 use scraper::Selector;
-use rustexpress::helpers::parse_html;
+use rustexpress::shared::utils::parse_html;
 use std::fs;
 
 fn main() {
