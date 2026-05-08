@@ -64,7 +64,7 @@ pub async fn anime_index(
                 .await
                 .map_err(|e| format!("Fetch error: {}", e))?;
 
-            let repo = Arc::new(MySqlImageRepository::new((*app_state.db).clone()));
+            let repo = Arc::new(MySqlImageRepository::new(app_state.db.clone()));
             let cache_image_use_case = CacheImageUseCase::new(repo, app_state.redis_pool.clone())
                 .with_semaphore(app_state.image_processing_semaphore.clone());
 

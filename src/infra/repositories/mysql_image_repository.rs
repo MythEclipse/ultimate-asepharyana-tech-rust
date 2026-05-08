@@ -5,12 +5,14 @@ use crate::core::repositories::image_repository::ImageRepository;
 use crate::entities::image_cache::{Entity as ImageCacheEntity, ActiveModel as ImageCacheActiveModel, Column};
 use crate::shared::errors::AppError;
 
+use std::sync::Arc;
+
 pub struct MySqlImageRepository {
-    db: DatabaseConnection,
+    db: Arc<DatabaseConnection>,
 }
 
 impl MySqlImageRepository {
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: Arc<DatabaseConnection>) -> Self {
         Self { db }
     }
 }
@@ -20,7 +22,7 @@ impl ImageRepository for MySqlImageRepository {
     async fn find_by_original_url(&self, url: &str) -> Result<Option<DomainImageCache>, AppError> {
         let model = ImageCacheEntity::find()
             .filter(Column::OriginalUrl.eq(url))
-            .one(&self.db)
+            .one(self.db.as_ref())
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
@@ -48,7 +50,7 @@ impl ImageRepository for MySqlImageRepository {
                     .update_columns([Column::CdnUrl, Column::CreatedAt, Column::ExpiresAt])
                     .to_owned(),
             )
-            .exec(&self.db)
+            .exec(self.db.as_ref())
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
@@ -58,7 +60,7 @@ impl ImageRepository for MySqlImageRepository {
     async fn delete_by_original_url(&self, url: &str) -> Result<(), AppError> {
         ImageCacheEntity::delete_many()
             .filter(Column::OriginalUrl.eq(url))
-            .exec(&self.db)
+            .exec(self.db.as_ref())
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
