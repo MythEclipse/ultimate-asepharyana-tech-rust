@@ -37,8 +37,7 @@ mod handler_mod_29 { pub use crate::routes::api::anime::genre::slug::page::page;
 mod handler_mod_30 { pub use crate::routes::api::anime::full::slug::slug; pub use crate::routes::api::anime::full::slug::__path_slug; }
 mod handler_mod_31 { pub use crate::routes::api::anime::detail::slug::slug; pub use crate::routes::api::anime::detail::slug::__path_slug; }
 mod handler_mod_32 { pub use crate::routes::api::anime::complete_anime::slug::slug; pub use crate::routes::api::anime::complete_anime::slug::__path_slug; }
-mod handler_mod_33 { pub use crate::routes::api::anime::index::anime; pub use crate::routes::api::anime::index::__path_anime; }
-mod handler_mod_34 { pub use crate::routes::api::anime::genre_list::genres; pub use crate::routes::api::anime::genre_list::__path_genres; }
+mod handler_mod_33 { pub use crate::routes::api::anime::genre_list::genres; pub use crate::routes::api::anime::genre_list::__path_genres; }
 
 #[derive(OpenApi)]
 #[openapi(
@@ -76,8 +75,7 @@ mod handler_mod_34 { pub use crate::routes::api::anime::genre_list::genres; pub 
         handler_mod_30::slug,
         handler_mod_31::slug,
         handler_mod_32::slug,
-        handler_mod_33::anime,
-        handler_mod_34::genres,
+        handler_mod_33::genres,
     ),
     components(
         schemas(
@@ -120,9 +118,6 @@ mod handler_mod_34 { pub use crate::routes::api::anime::genre_list::genres; pub 
             crate::routes::api::anime::genre::slug::page::Pagination,
             crate::routes::api::anime::genre_list::Genre,
             crate::routes::api::anime::genre_list::GenresResponse,
-            crate::routes::api::anime::index::AnimeData,
-            crate::routes::api::anime::index::CompleteAnimeItem,
-            crate::routes::api::anime::index::OngoingAnimeItem,
             crate::routes::api::anime::latest::slug::LatestAnimeItem,
             crate::routes::api::anime::latest::slug::LatestAnimeResponse,
             crate::routes::api::anime::latest::slug::Pagination,
