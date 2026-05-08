@@ -4,11 +4,11 @@ use crate::routes::AppState;
 // Standard library imports
 
 // External crate imports
-use crate::helpers::{
+use crate::shared::utils::{
     default_backoff, internal_err, parse_html, transient, Cache,
 };
 use crate::services::images::cache::{get_cached_or_original, cache_image_urls_batch_lazy};
-use crate::helpers::scraping::{attr, attr_from_or, extract_slug, selector, text, text_from_or};
+use crate::shared::utils::scraping::{attr, attr_from_or, extract_slug, selector, text, text_from_or};
 use crate::infra::proxy::fetch_with_proxy;
 use crate::scraping::urls::OTAKUDESU_BASE_URL;
 use crate::core::error::AppError;

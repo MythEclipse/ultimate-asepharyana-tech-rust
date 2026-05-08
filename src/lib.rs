@@ -20,17 +20,19 @@ pub mod browser; // Browser tab pooling for scraping
 pub mod events; // Event bus (pub/sub)
 pub mod graceful; // Graceful shutdown with signals
 pub mod health; // Health check endpoints
-pub mod helpers; // Utility helpers (string, datetime, file)
 pub mod jobs; // Background job processing
 pub mod middleware; // logging, request_id, cors, compression middleware
 pub mod observability; // request ID, tracing
 pub mod scheduler; // Cron jobs
 
 // ============================================================================
-// Data Layer
+// Data Layer (Legacy - Prefer src/core)
 // ============================================================================
+#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod entities; // SeaORM entities
+#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod models; // Data models + types
+#[deprecated(note = "Legacy module for existing routes. Use crate::core instead.")]
 pub mod services; // Domain services
 
 // ============================================================================

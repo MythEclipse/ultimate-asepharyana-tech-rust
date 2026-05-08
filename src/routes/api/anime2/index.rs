@@ -1,7 +1,7 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry};
+use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{response::IntoResponse, Json};

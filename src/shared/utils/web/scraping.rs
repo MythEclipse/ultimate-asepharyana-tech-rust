@@ -1,6 +1,6 @@
 //! HTML scraping helpers using scraper crate.
 
-use crate::helpers::{default_backoff, transient};
+use crate::shared::utils::{default_backoff, transient};
 use crate::infra::proxy::fetch_with_proxy;
 use backoff::future::retry;
 use once_cell::sync::Lazy;

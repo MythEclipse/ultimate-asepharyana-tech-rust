@@ -2,8 +2,8 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::scraping::{attr, selector, text, text_from_or};
-use crate::helpers::{fetch_html_with_retry, internal_err, parse_html, Cache};
+use crate::shared::utils::scraping::{attr, selector, text, text_from_or};
+use crate::shared::utils::{fetch_html_with_retry, internal_err, parse_html, Cache};
 use crate::scraping::urls::get_komik_url;
 use crate::services::images::cache::get_cached_or_original;
 use axum::{

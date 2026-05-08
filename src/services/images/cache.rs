@@ -14,9 +14,9 @@ use tracing::{debug, error, warn};
 
 use crate::infra::http_client::http_client;
 
-use crate::helpers::Cache;
+use crate::shared::utils::Cache;
 
-use crate::helpers::cache_ttl::CACHE_TTL_IMAGE;
+use crate::shared::utils::cache_ttl::CACHE_TTL_IMAGE;
 
 /// Default TTL for image cache in Redis (24 hours)
 pub const IMAGE_CACHE_TTL: u64 = CACHE_TTL_IMAGE;

@@ -1,7 +1,7 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::{
+use crate::shared::utils::{
     internal_err, Cache, fetch_html_with_retry, text_from_or, attr_from_or, extract_slug,
     parse_html, selector
 };

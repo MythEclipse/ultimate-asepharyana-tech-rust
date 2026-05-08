@@ -1,8 +1,8 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::api_response::{internal_err, ApiResult, ApiResponse};
-use crate::helpers::{default_backoff, transient, Cache};
+use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
+use crate::shared::utils::{default_backoff, transient, Cache};
 use crate::infra::proxy::fetch_with_proxy;
 use crate::models::anime2::{FilterAnimeItem, Pagination};
 use axum::extract::{Query, State};
@@ -197,7 +197,7 @@ fn parse_filter_page(
     html: &str,
     current_page: u32,
 ) -> Result<(Vec<FilterAnimeItem>, Pagination), Box<dyn std::error::Error + Send + Sync>> {
-    let document = crate::helpers::parse_html(html);
+    let document = crate::shared::utils::parse_html(html);
     let mut anime_list = Vec::new();
 
     for element in document.select(&ITEM_SELECTOR) {

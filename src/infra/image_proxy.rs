@@ -1,5 +1,5 @@
 use crate::core::error::AppError;
-use crate::helpers::http::common_image_headers;
+use crate::shared::utils::http::common_image_headers;
 use bytes::Bytes;
 use reqwest::Client;
 use tracing::{error, info}; // Import the new common_headers and common_image_headers functions

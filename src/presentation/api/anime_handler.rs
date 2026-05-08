@@ -8,7 +8,7 @@ use crate::infra::repositories::mysql_image_repository::MySqlImageRepository;
 use crate::shared::errors::AppError;
 use crate::core::types::ApiResponse;
 use crate::scraping::urls::get_otakudesu_url;
-use crate::helpers::{parse_html, Cache, fetch_html_with_retry, text_from_or, attr_from_or, selector, extract_slug, attr_from};
+use crate::shared::utils::{parse_html, Cache, fetch_html_with_retry, text_from_or, attr_from_or, selector, extract_slug, attr_from};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use tracing::info;
@@ -37,7 +37,7 @@ pub struct AnimeData {
     pub complete_anime: Vec<CompleteAnimeItem>,
 }
 
-use crate::helpers::cache_ttl::CACHE_TTL_VERY_SHORT;
+use crate::shared::utils::cache_ttl::CACHE_TTL_VERY_SHORT;
 const CACHE_TTL: u64 = CACHE_TTL_VERY_SHORT;
 
 #[utoipa::path(

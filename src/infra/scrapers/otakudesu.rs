@@ -1,7 +1,7 @@
-use crate::helpers::web::scraping::{
+use crate::shared::utils::web::scraping::{
     attr, attr_from_or, extract_slug, selector, text, text_from_or,
 };
-use crate::helpers::parse_html;
+use crate::shared::utils::parse_html;
 use crate::models::anime2::*;
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};

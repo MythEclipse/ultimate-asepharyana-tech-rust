@@ -1,6 +1,6 @@
 //! Redis caching helpers.
 
-use crate::helpers::cache_ttl::CACHE_TTL_VERY_SHORT;
+use crate::shared::utils::cache_ttl::CACHE_TTL_VERY_SHORT;
 use deadpool_redis::redis::AsyncCommands;
 use deadpool_redis::Pool;
 use serde::{de::DeserializeOwned, Serialize};

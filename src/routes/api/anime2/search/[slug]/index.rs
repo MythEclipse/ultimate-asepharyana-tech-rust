@@ -1,8 +1,8 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::api_response::{internal_err, ApiResult, ApiResponse};
-use crate::helpers::{fetch_html_with_retry, parse_html, Cache};
+use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
+use crate::shared::utils::{fetch_html_with_retry, parse_html, Cache};
 use axum::extract::{Path, State};
 // Wait, the file doesn't use StatusCode in its signature, it uses ApiResult which is a custom wrapper.
 

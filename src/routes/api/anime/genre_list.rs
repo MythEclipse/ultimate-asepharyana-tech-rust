@@ -1,8 +1,8 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::helpers::scraping::{selector, extract_slug, text, attr};
+use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry, parse_html};
+use crate::shared::utils::scraping::{selector, extract_slug, text, attr};
 use crate::scraping::urls::get_otakudesu_url;
 use axum::extract::State;
 use axum::http::StatusCode;

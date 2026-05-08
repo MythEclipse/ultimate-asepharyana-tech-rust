@@ -1,7 +1,7 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry, text_from_or, attr_from_or};
+use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry, text_from_or, attr_from_or};
 use crate::scraping::urls::get_otakudesu_url;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -167,17 +167,17 @@ fn parse_latest_page(
     html: &str,
     current_page: u32,
 ) -> Result<(Vec<LatestAnimeItem>, Pagination), Box<dyn std::error::Error + Send + Sync>> {
-    let document = crate::helpers::scraping::parse_html(html);
+    let document = crate::shared::utils::scraping::parse_html(html);
     let mut anime_list = Vec::new();
 
-    let venz_selector = crate::helpers::scraping::selector(".venz ul li").unwrap();
-    let title_selector = crate::helpers::scraping::selector(".thumbz h2.jdlflm").unwrap();
-    let img_selector = crate::helpers::scraping::selector("img").unwrap();
-    let ep_selector = crate::helpers::scraping::selector(".epz").unwrap();
-    let link_selector = crate::helpers::scraping::selector("a").unwrap();
+    let venz_selector = crate::shared::utils::scraping::selector(".venz ul li").unwrap();
+    let title_selector = crate::shared::utils::scraping::selector(".thumbz h2.jdlflm").unwrap();
+    let img_selector = crate::shared::utils::scraping::selector("img").unwrap();
+    let ep_selector = crate::shared::utils::scraping::selector(".epz").unwrap();
+    let link_selector = crate::shared::utils::scraping::selector("a").unwrap();
     let pagination_selector =
-        crate::helpers::scraping::selector(".pagination .page-numbers:not(.next)").unwrap();
-    let next_selector = crate::helpers::scraping::selector(".pagination .next").unwrap();
+        crate::shared::utils::scraping::selector(".pagination .page-numbers:not(.next)").unwrap();
+    let next_selector = crate::shared::utils::scraping::selector(".pagination .next").unwrap();
     
     // We can use compile_regex from helpers if available, or just use the Lazy one from scraping.rs 
     // But since SLUG_REGEX is already defined in scraping.rs, we can use extract_slug but need to be careful
@@ -189,7 +189,7 @@ fn parse_latest_page(
         let current_episode = text_from_or(&element, &ep_selector, "N/A");
         let anime_url = attr_from_or(&element, &link_selector, "href", "");
         
-        let slug = crate::helpers::scraping::extract_slug(&anime_url);
+        let slug = crate::shared::utils::scraping::extract_slug(&anime_url);
 
         // Extract release time if available
         let release_time = "Recently".to_string(); // Could be enhanced with actual time

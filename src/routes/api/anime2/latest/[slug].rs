@@ -1,8 +1,8 @@
 use axum::Router;
 use std::sync::Arc;
 use crate::routes::AppState;
-use crate::helpers::api_response::{internal_err, ApiResult, ApiResponse};
-use crate::helpers::{fetch_html_with_retry, Cache};
+use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
+use crate::shared::utils::{fetch_html_with_retry, Cache};
 use axum::extract::{Path, State};
 
 use serde_json::json;
@@ -121,7 +121,7 @@ fn parse_latest_page(
     html: &str,
     current_page: u32,
 ) -> Result<(Vec<LatestAnimeItem>, Pagination), Box<dyn std::error::Error + Send + Sync>> {
-    let document = crate::helpers::parse_html(html);
+    let document = crate::shared::utils::parse_html(html);
 
     // Use shared parser for anime items
     let anime_list = parsers::parse_latest_anime(html)?;

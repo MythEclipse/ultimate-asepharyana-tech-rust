@@ -10,8 +10,8 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use crate::helpers::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::helpers::scraping::{selector, text_from_or, attr_from_or, extract_slug, text, extract_parentheses};
+use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry, parse_html};
+use crate::shared::utils::scraping::{selector, text_from_or, attr_from_or, extract_slug, text, extract_parentheses};
 use crate::scraping::urls::get_otakudesu_url;
 
 use serde::{Deserialize, Serialize};

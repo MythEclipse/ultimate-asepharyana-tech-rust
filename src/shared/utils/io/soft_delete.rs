@@ -77,7 +77,7 @@ pub fn soft_delete_filter<C: ColumnTrait>(column: C, scope: SoftDeleteScope) -> 
 #[macro_export]
 macro_rules! impl_soft_deletable {
     ($model:ty, $deleted_at_field:ident) => {
-        impl $crate::helpers::soft_delete::SoftDeletable for $model {
+        impl $crate::shared::utils::soft_delete::SoftDeletable for $model {
             fn deleted_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
                 self.$deleted_at_field
             }

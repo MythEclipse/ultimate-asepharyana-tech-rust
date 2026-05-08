@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::entities::image_cache;
-use crate::helpers::cache::Cache;
+use crate::shared::utils::cache::Cache;
 use crate::infra::redis::get_redis_pool;
 
 use super::ScheduledTask;

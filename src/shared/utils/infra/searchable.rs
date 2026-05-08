@@ -181,7 +181,7 @@ pub fn build_like_condition<C: ColumnTrait>(columns: Vec<C>, term: &str) -> Cond
 #[macro_export]
 macro_rules! impl_searchable {
     ($entity:ty, $($field:ident),+) => {
-        impl $crate::helpers::searchable::Searchable for $entity {
+        impl $crate::shared::utils::searchable::Searchable for $entity {
             fn searchable_fields() -> Vec<&'static str> {
                 vec![$(stringify!($field)),+]
             }

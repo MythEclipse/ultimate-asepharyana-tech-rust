@@ -78,7 +78,7 @@ macro_rules! crud_handlers {
 ///     }).await
 /// }
 /// ```
-pub async fn try_handler<T, E, F, Fut>(f: F) -> Result<crate::helpers::JsonResponse<T>, crate::helpers::ErrorResponse>
+pub async fn try_handler<T, E, F, Fut>(f: F) -> Result<crate::shared::utils::JsonResponse<T>, crate::shared::utils::ErrorResponse>
 where
     T: serde::Serialize,
     E: std::fmt::Display,
@@ -86,8 +86,8 @@ where
     Fut: std::future::Future<Output = Result<T, E>>,
 {
     match f().await {
-        Ok(data) => Ok(crate::helpers::JsonResponse::ok(data)),
-        Err(e) => Err(crate::helpers::ErrorResponse::internal(e.to_string())),
+        Ok(data) => Ok(crate::shared::utils::JsonResponse::ok(data)),
+        Err(e) => Err(crate::shared::utils::ErrorResponse::internal(e.to_string())),
     }
 }
 

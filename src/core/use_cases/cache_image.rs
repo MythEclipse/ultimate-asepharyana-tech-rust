@@ -9,8 +9,8 @@ use metrics::{counter, histogram};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
-use crate::helpers::Cache;
-use crate::helpers::cache_ttl::CACHE_TTL_IMAGE;
+use crate::shared::utils::Cache;
+use crate::shared::utils::cache_ttl::CACHE_TTL_IMAGE;
 use crate::infra::http_client::http_client;
 
 /// Default TTL for image cache in Redis (24 hours)

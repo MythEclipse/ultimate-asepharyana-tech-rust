@@ -4,8 +4,8 @@ use crate::routes::AppState;
 // Standard library imports
 
 // External crate imports
-use crate::helpers::api_response::{internal_err, ApiResult, ApiResponse};
-use crate::helpers::{fetch_html_with_retry, parse_html, Cache};
+use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
+use crate::shared::utils::{fetch_html_with_retry, parse_html, Cache};
 use axum::{
     extract::{Path, State}};
 

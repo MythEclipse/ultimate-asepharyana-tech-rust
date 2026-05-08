@@ -95,7 +95,7 @@ fn main() {
     println!("  -> latest() handler");
     println!("  -> fetch_latest_anime()");
     println!("  -> parse_latest_page(html, page)");
-    println!("  -> crate::helpers::parse_html(html) [line 124]\n");
+    println!("  -> crate::shared::utils::parse_html(html) [line 124]\n");
     
     println!("Helper Function: src/helpers/web/scraping.rs");
     println!("  pub fn parse_html(html: &str) -> Html {{");
@@ -103,7 +103,7 @@ fn main() {
     println!("  }}\n");
 
     println!("Call Stack to Warning:");
-    println!("  1. crate::helpers::parse_html() [src/helpers/web/scraping.rs:34]");
+    println!("  1. crate::shared::utils::parse_html() [src/helpers/web/scraping.rs:34]");
     println!("  2. Html::parse_document() [scraper crate wrapper]");
     println!("  3. html5ever::parse() [Cargo.toml: version 0.36.1]");
     println!("  4. TreeBuilder::process_token()");
