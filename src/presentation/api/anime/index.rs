@@ -37,8 +37,7 @@ pub struct AnimeData {
     pub complete_anime: Vec<CompleteAnimeItem>,
 }
 
-use crate::shared::utils::cache_ttl::CACHE_TTL_VERY_SHORT;
-const CACHE_TTL: u64 = CACHE_TTL_VERY_SHORT;
+const CACHE_TTL: u64 = 10;
 
 #[utoipa::path(
     get,
