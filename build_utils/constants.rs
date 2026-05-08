@@ -13,6 +13,11 @@ pub static ENDPOINT_METADATA_REGEX: Lazy<Result<Regex, regex::Error>> = Lazy::ne
 pub static DYNAMIC_REGEX: Lazy<Result<Regex, regex::Error>> =
     Lazy::new(|| Regex::new(r"\[([^\]]+)\]"));
 
+pub const API_MOD_PREFIX: &str = "crate::presentation::api";
+pub const INDEX_FILE: &str = "index";
+pub const MOD_RS: &str = "mod.rs";
+pub const RS_EXTENSION: &str = "rs";
+
 #[inline]
 pub fn get_handler_fn_regex() -> &'static Regex {
     HANDLER_FN_REGEX.as_ref().expect("Valid regex")

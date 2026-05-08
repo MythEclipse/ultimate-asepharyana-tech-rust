@@ -3,7 +3,7 @@
 //! This module generates mod.rs files automatically based on discovered routes.
 
 use crate::build_utils::handler_updater::{update_handler_file, HandlerRouteInfo};
-use crate::build_utils::path_utils::sanitize_module_name;
+use crate::build_utils::path_utils::{compute_module_path_prefix, sanitize_module_name};
 use crate::build_utils::route_scanner::scan_routes;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
@@ -164,34 +164,4 @@ fn generate_registration_code(module_names: &[String]) -> String {
         .fold("router".to_string(), |acc, name| {
             format!("{}::register_routes({})", name, acc)
         })
-}
-
-fn compute_module_path_prefix(current_dir: &Path, root_api_path: &Path) -> Result<String> {
-    let relative_path = current_dir
-        .strip_prefix(root_api_path)
-        .unwrap_or(Path::new(""));
-
-    let relative_path_str = relative_path
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("Invalid path encoding"))?
-        .replace(std::path::MAIN_SEPARATOR, "::")
-        .replace('-', "_");
-
-    let module_path_prefix = if relative_path_str.is_empty() {
-        "crate::presentation::api".to_string()
-    } else {
-        let sanitized_segments: Vec<String> = relative_path_str
-            .split("::")
-            .map(|s| {
-                s.trim_matches(|c| c == '[' || c == ']')
-                    .replace("...", "")
-                    .replace('-', "_")
-            })
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        format!("crate::presentation::api::{}", sanitized_segments.join("::"))
-    };
-
-    Ok(module_path_prefix)
 }

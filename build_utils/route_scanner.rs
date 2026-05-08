@@ -4,6 +4,7 @@
 //! from files, enabling Next.js-style automatic routing.
 
 use crate::build_utils::types::{DynamicParam, RouteFileInfo};
+use crate::build_utils::constants::{INDEX_FILE, MOD_RS, RS_EXTENSION};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
@@ -19,11 +20,11 @@ pub fn scan_routes(api_dir: &Path) -> Result<Vec<RouteFileInfo>> {
         
         // Skip specific excluded directories/files
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if file_name.starts_with('.') || file_name.starts_with('_') || file_name == "mod.rs" {
+        if file_name.starts_with('.') || file_name.starts_with('_') || file_name == MOD_RS {
             continue;
         }
 
-        if path.is_file() && path.extension().is_some_and(|e| e == "rs") {
+        if path.is_file() && path.extension().is_some_and(|e| e == RS_EXTENSION) {
              if let Some(route_info) = extract_route_info(path, api_dir)? {
                 routes.push(route_info);
             }
@@ -71,7 +72,7 @@ fn extract_route_info(file_path: &Path, api_root: &Path) -> Result<Option<RouteF
         return Ok(None);
     }
 
-    let is_index = file_stem == "index";
+    let is_index = file_stem == INDEX_FILE;
     let (is_dynamic, dynamic_params) = extract_dynamic_params_from_filename(file_stem);
     let route_path = build_route_path(file_path, api_root, is_index, &dynamic_params)?;
 

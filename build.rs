@@ -58,52 +58,14 @@ fn main() -> Result<()> {
 
     let mut operation = BuildOperation::new();
 
-    // Phase 1: Dry run - check for potential errors without modifying files
-    println!("cargo:warning=🔍 Phase 1: Validating API structure...");
-    if let Err(e) = perform_dry_run(&config) {
-        println!("cargo:warning=❌ Validation failed: {}", e);
-        return Err(e);
-    }
-    println!("cargo:warning=✓ Validation passed");
-
-    // Phase 2: Actual build
-    println!("cargo:warning=🔨 Phase 2: Building API routes...");
-    perform_build(&config, &mut operation)?;
-
-    // Print summary
-    print_build_summary(&operation);
-
-    println!("cargo:warning=✅ API build completed successfully");
-    log::info!("✨ API build process completed successfully");
-    Ok(())
-}
-
-/// Performs a dry run
-fn perform_dry_run(config: &BuildConfig) -> Result<()> {
-    log::debug!("🔍 Performing dry run validation");
-
-    let api_routes_path = setup_build_environment(config)?;
-    let (api_handlers, modules) = collect_api_data(&api_routes_path)?;
-
-    log::info!(
-        "📊 Found {} handlers, {} modules",
-        api_handlers.len(),
-        modules.len()
-    );
-
-    log::info!("✓ Dry run validation passed");
-    Ok(())
-}
-
-/// Performs the actual build
-fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result<()> {
-    log::debug!("🔨 Performing actual build");
-
-    let api_routes_path = setup_build_environment(config)?;
+    // Setup environment once
+    let api_routes_path = setup_build_environment(&config)?;
 
     // Use auto-routing by default (new system)
     let use_legacy = env::var("DISABLE_AUTO_ROUTING").is_ok();
 
+    // Phase 1: Data Collection & Validation
+    println!("cargo:warning=🔍 Phase 1: Validating API structure...");
     let (api_handlers, modules) = if use_legacy {
         println!("cargo:warning=⚠️  Using legacy routing system (DISABLE_AUTO_ROUTING=1)");
         collect_api_data(&api_routes_path)?
@@ -111,18 +73,13 @@ fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result
         println!("cargo:warning=🚀 Using auto-routing system (default)");
         collect_api_data_auto(&api_routes_path)?
     };
+    println!("cargo:warning=✓ Validation passed ({} handlers, {} modules)", api_handlers.len(), modules.len());
 
-    // Generate OpenAPI spec automatically
+    // Phase 2: Build
+    println!("cargo:warning=🔨 Phase 2: Building OpenAPI spec...");
     openapi_generator::generate_openapi_spec(&config.project_root, &api_handlers)?;
 
-    // Track successful build
-    log::info!(
-        "📝 Generated API: {} handlers, {} modules",
-        api_handlers.len(),
-        modules.len()
-    );
-
-    // Store stats in operation for summary
+    // Store stats
     let routing_mode = if use_legacy { "legacy" } else { "auto" };
     operation.add_warning(format!(
         "API generated with {} handlers, {} modules ({})",
@@ -131,6 +88,11 @@ fn perform_build(config: &BuildConfig, operation: &mut BuildOperation) -> Result
         routing_mode
     ));
 
+    // Print summary
+    print_build_summary(&operation);
+
+    println!("cargo:warning=✅ API build completed successfully");
+    log::info!("✨ API build process completed successfully");
     Ok(())
 }
 

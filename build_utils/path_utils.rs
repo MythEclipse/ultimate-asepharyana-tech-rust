@@ -160,18 +160,22 @@ pub fn compute_module_path_prefix(current_dir: &std::path::Path, root_api_path: 
     let relative_path_str = relative_path
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Invalid path encoding for directory: {:?}", current_dir))?
-        .replace(std::path::MAIN_SEPARATOR, "::")
-        .replace('-', "_");
+        .replace(std::path::MAIN_SEPARATOR, "::");
 
-    let module_path_prefix = if relative_path_str.is_empty() {
-        "crate::routes::api".to_string()
-    } else {
+    let mut prefix = crate::build_utils::constants::API_MOD_PREFIX.to_string();
+
+    if !relative_path_str.is_empty() {
         let sanitized_segments: Vec<String> = relative_path_str
             .split("::")
-            .map(|s| sanitize_module_name(&s.replace("[", "").replace("]", "")))
+            .map(sanitize_module_name)
+            .filter(|s| !s.is_empty())
             .collect();
-        format!("crate::routes::api::{}", sanitized_segments.join("::"))
-    };
 
-    Ok(module_path_prefix)
+        if !sanitized_segments.is_empty() {
+            prefix.push_str("::");
+            prefix.push_str(&sanitized_segments.join("::"));
+        }
+    }
+
+    Ok(prefix)
 }
