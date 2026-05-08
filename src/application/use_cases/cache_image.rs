@@ -74,16 +74,52 @@ impl CacheImageUseCase {
     }
 
     pub async fn execute(&self, original_url: &str) -> Result<String, String> {
+        self.execute_lazy(original_url).await
+    }
+
+    pub async fn execute_lazy(&self, original_url: &str) -> Result<String, String> {
         let hash = self.url_hash(original_url);
         let cache_key = format!("{}:{}", IMAGE_CACHE_PREFIX, hash);
-        let lock_key = format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, hash);
+        let _lock_key = format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, hash);
 
-        // 1. Redis
+        // 1. Redis Check
         let redis_cache = Cache::new(&self.redis);
         counter!("image_cache_requests_total").increment(1);
 
         if let Some(cached_url) = redis_cache.get::<String>(&cache_key).await {
             counter!("image_cache_hit_total", "source" => "redis").increment(1);
+
+            // Verify in background
+            let repo = self.repo.clone();
+            let redis = self.redis.clone();
+            let url = original_url.to_string();
+            let cdn = cached_url.clone();
+            let client = self.client.clone();
+            let sem = self.semaphore.clone();
+
+            tokio::spawn(async move {
+                let verify_client = client.clone();
+                match verify_client.get(&cdn).send().await {
+                    Ok(resp) if resp.status().is_success() => {}, // OK
+                    _ => {
+                        error!("CDN URL {} broken, purging and re-fetching", cdn);
+                        let _ = repo.delete_by_original_url(&url).await;
+                        let redis_c = Cache::new(&redis);
+                        let hash = url_hash_internal(url.as_str());
+                        let _ = redis_c.delete(format!("{}:{}", IMAGE_CACHE_PREFIX, hash).as_str()).await;
+
+                        // Trigger re-upload
+                        let uc = CacheImageUseCase {
+                            repo,
+                            redis,
+                            client,
+                            semaphore: sem,
+                        };
+                        let _ = uc.do_cache(url.as_str(), &format!("{}:{}", IMAGE_CACHE_PREFIX, hash), &format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, hash)).await;
+                    }
+                }
+            });
+
             return Ok(cached_url);
         }
 
@@ -101,17 +137,27 @@ impl CacheImageUseCase {
         };
 
         if !is_leader {
-            let mut rx = tx.subscribe();
-            return match rx.recv().await {
-                Ok(res) => res,
-                Err(_) => Err("Upload coalescing failed".to_string()),
-            };
+            // If already in flight, return original immediately (proactive)
+            return Ok(crate::application::services::images::cache::to_wp_cdn(original_url));
         }
 
-        let result = self.do_cache(original_url, &cache_key, &lock_key).await;
-        let _ = tx.send(result.clone());
+        // Leader triggers do_cache in background and returns original immediately
+        let repo = self.repo.clone();
+        let redis = self.redis.clone();
+        let url = original_url.to_string();
+        let client = self.client.clone();
+        let sem = self.semaphore.clone();
+
+        tokio::spawn(async move {
+            let hash = url_hash_internal(url.as_str());
+            let uc = CacheImageUseCase { repo, redis, client, semaphore: sem };
+            let _ = uc.do_cache(url.as_str(), &format!("{}:{}", IMAGE_CACHE_PREFIX, hash), &format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, hash)).await;
+            let _ = tx.send(Ok(url.clone())); // Dummy send to clear coalescing
+        });
+
         IN_FLIGHT_UPLOADS.remove(original_url);
-        result
+
+        Ok(crate::application::services::images::cache::to_wp_cdn(original_url))
     }
 
     async fn do_cache(&self, original_url: &str, cache_key: &str, lock_key: &str) -> Result<String, String> {
@@ -247,11 +293,8 @@ impl CacheImageUseCase {
         Err("No CDN URL found".to_string())
     }
 
-    fn url_hash(&self, url: &str) -> String {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(url.as_bytes());
-        hex::encode(&hasher.finalize()[..16])
+    pub fn url_hash(&self, url: &str) -> String {
+        url_hash_internal(url)
     }
 
     async fn invalidate_api_caches(&self) -> Result<(), String> {
@@ -271,4 +314,11 @@ impl CacheImageUseCase {
         }
         Ok(())
     }
+}
+
+fn url_hash_internal(url: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    hex::encode(&hasher.finalize()[..16])
 }

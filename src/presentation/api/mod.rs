@@ -3,7 +3,6 @@
 
 pub mod anime2;
 pub mod anime;
-pub mod anime_handler;
 pub mod komik;
 pub mod proxy;
 
@@ -13,5 +12,5 @@ use std::sync::Arc;
 use crate::presentation::state::AppState;
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    anime::register_routes(anime2::register_routes(anime_handler::register_routes(komik::register_routes(proxy::register_routes(router)))))
+    anime::register_routes(anime2::register_routes(komik::register_routes(proxy::register_routes(router))))
 }

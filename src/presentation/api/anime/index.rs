@@ -50,6 +50,7 @@ const CACHE_TTL: u64 = CACHE_TTL_VERY_SHORT;
         (status = 500, description = "Internal Server Error", body = String)
     )
 )]
+// ENDPOINT_PATH: /api/anime
 pub async fn anime_index(
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -68,28 +69,26 @@ pub async fn anime_index(
             let cache_image_use_case = CacheImageUseCase::new(repo, app_state.redis_pool.clone())
                 .with_semaphore(app_state.image_processing_semaphore.clone());
 
-            let mut all_posters = Vec::new();
-            for item in &data.ongoing_anime {
-                all_posters.push(item.poster.clone());
+            let mut futures = Vec::new();
+            for item in data.ongoing_anime.iter() {
+                futures.push(cache_image_use_case.execute_lazy(&item.poster));
             }
-            for item in &data.complete_anime {
-                all_posters.push(item.poster.clone());
+            for item in data.complete_anime.iter() {
+                futures.push(cache_image_use_case.execute_lazy(&item.poster));
             }
 
-            let mut cached_urls = Vec::new();
-            for poster_url in all_posters {
-                match cache_image_use_case.execute(&poster_url).await {
-                    Ok(cdn_url) => cached_urls.push(cdn_url),
-                    Err(_) => cached_urls.push(poster_url),
-                }
-            }
+            let cached_urls = futures::future::join_all(futures).await;
 
             let ongoing_len = data.ongoing_anime.len();
             for (i, item) in data.ongoing_anime.iter_mut().enumerate() {
-                item.poster = cached_urls[i].clone();
+                if let Ok(cdn_url) = &cached_urls[i] {
+                    item.poster = cdn_url.clone();
+                }
             }
             for (i, item) in data.complete_anime.iter_mut().enumerate() {
-                item.poster = cached_urls[ongoing_len + i].clone();
+                if let Ok(cdn_url) = &cached_urls[ongoing_len + i] {
+                    item.poster = cdn_url.clone();
+                }
             }
 
             Ok(ApiResponse::success(data))
@@ -191,5 +190,5 @@ fn parse_complete_anime(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime_handler", axum::routing::get(anime_index))
+    router.route("/api/anime", axum::routing::get(anime_index))
 }

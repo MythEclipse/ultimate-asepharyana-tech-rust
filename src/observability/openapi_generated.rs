@@ -37,8 +37,8 @@ mod handler_mod_29 { pub use crate::presentation::api::anime::genre::slug::page:
 mod handler_mod_30 { pub use crate::presentation::api::anime::full::slug::slug; pub use crate::presentation::api::anime::full::slug::__path_slug; }
 mod handler_mod_31 { pub use crate::presentation::api::anime::detail::slug::slug; pub use crate::presentation::api::anime::detail::slug::__path_slug; }
 mod handler_mod_32 { pub use crate::presentation::api::anime::complete_anime::slug::slug; pub use crate::presentation::api::anime::complete_anime::slug::__path_slug; }
-mod handler_mod_33 { pub use crate::presentation::api::anime::genre_list::genres; pub use crate::presentation::api::anime::genre_list::__path_genres; }
-mod handler_mod_34 { pub use crate::presentation::api::anime_handler::anime_index; pub use crate::presentation::api::anime_handler::__path_anime_index; }
+mod handler_mod_33 { pub use crate::presentation::api::anime::index::anime_index; pub use crate::presentation::api::anime::index::__path_anime_index; }
+mod handler_mod_34 { pub use crate::presentation::api::anime::genre_list::genres; pub use crate::presentation::api::anime::genre_list::__path_genres; }
 
 #[derive(OpenApi)]
 #[openapi(
@@ -76,8 +76,8 @@ mod handler_mod_34 { pub use crate::presentation::api::anime_handler::anime_inde
         handler_mod_30::slug,
         handler_mod_31::slug,
         handler_mod_32::slug,
-        handler_mod_33::genres,
-        handler_mod_34::anime_index,
+        handler_mod_33::anime_index,
+        handler_mod_34::genres,
     ),
     components(
         schemas(
@@ -120,6 +120,9 @@ mod handler_mod_34 { pub use crate::presentation::api::anime_handler::anime_inde
             crate::presentation::api::anime::genre::slug::page::Pagination,
             crate::presentation::api::anime::genre_list::Genre,
             crate::presentation::api::anime::genre_list::GenresResponse,
+            crate::presentation::api::anime::index::AnimeData,
+            crate::presentation::api::anime::index::CompleteAnimeItem,
+            crate::presentation::api::anime::index::OngoingAnimeItem,
             crate::presentation::api::anime::latest::slug::LatestAnimeItem,
             crate::presentation::api::anime::latest::slug::LatestAnimeResponse,
             crate::presentation::api::anime::latest::slug::Pagination,
@@ -134,9 +137,6 @@ mod handler_mod_34 { pub use crate::presentation::api::anime_handler::anime_inde
             crate::presentation::api::anime::search::slug::page::Pagination,
             crate::presentation::api::anime::search::slug::page::SearchQuery,
             crate::presentation::api::anime::search::slug::page::SearchResponse,
-            crate::presentation::api::anime_handler::AnimeData,
-            crate::presentation::api::anime_handler::CompleteAnimeItem,
-            crate::presentation::api::anime_handler::OngoingAnimeItem,
             crate::presentation::api::komik::chapter::slug::ChapterData,
             crate::presentation::api::komik::chapter::slug::ChapterQuery,
             crate::presentation::api::komik::chapter::slug::ChapterResponse,

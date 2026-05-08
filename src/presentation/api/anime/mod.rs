@@ -6,6 +6,7 @@ pub mod detail;
 pub mod full;
 pub mod genre;
 pub mod genre_list;
+pub mod index;
 pub mod latest;
 pub mod ongoing_anime;
 pub mod search;
@@ -16,5 +17,5 @@ use std::sync::Arc;
 use crate::presentation::state::AppState;
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    complete_anime::register_routes(detail::register_routes(full::register_routes(genre::register_routes(genre_list::register_routes(latest::register_routes(ongoing_anime::register_routes(search::register_routes(router))))))))
+    complete_anime::register_routes(detail::register_routes(full::register_routes(genre::register_routes(genre_list::register_routes(index::register_routes(latest::register_routes(ongoing_anime::register_routes(search::register_routes(router)))))))))
 }
