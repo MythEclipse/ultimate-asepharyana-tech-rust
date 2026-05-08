@@ -191,5 +191,5 @@ fn parse_complete_anime(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime_handler", axum::routing::get(anime_index))
+    router.route("/api/anime", axum::routing::get(anime_index))
 }
