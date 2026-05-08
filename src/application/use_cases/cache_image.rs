@@ -153,9 +153,8 @@ impl CacheImageUseCase {
             let uc = CacheImageUseCase { repo, redis, client, semaphore: sem };
             let _ = uc.do_cache(url.as_str(), &format!("{}:{}", IMAGE_CACHE_PREFIX, hash), &format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, hash)).await;
             let _ = tx.send(Ok(url.clone())); // Dummy send to clear coalescing
+            IN_FLIGHT_UPLOADS.remove(&url);
         });
-
-        IN_FLIGHT_UPLOADS.remove(original_url);
 
         Ok(crate::application::services::images::cache::to_wp_cdn(original_url))
     }
@@ -165,9 +164,15 @@ impl CacheImageUseCase {
 
         // 3. Repo
         if let Ok(Some(image)) = self.repo.find_by_original_url(original_url).await {
-            let _ = redis_cache.set_with_ttl(cache_key, &image.cdn_url, IMAGE_CACHE_TTL).await;
-            counter!("image_cache_hit_total", "source" => "db").increment(1);
-            return Ok(image.cdn_url);
+            // Verify DB hit before trusting it
+            if self.verify_cdn_url(&image.cdn_url).await.unwrap_or(false) {
+                let _ = redis_cache.set_with_ttl(cache_key, &image.cdn_url, IMAGE_CACHE_TTL).await;
+                counter!("image_cache_hit_total", "source" => "db").increment(1);
+                return Ok(image.cdn_url);
+            } else {
+                tracing::warn!("DB CDN URL {} broken, re-caching", image.cdn_url);
+                let _ = self.repo.delete_by_original_url(original_url).await;
+            }
         }
 
         // 4. Lock
@@ -204,6 +209,7 @@ impl CacheImageUseCase {
             let _ = redis_cache.set_with_ttl(cache_key, cdn_url, IMAGE_CACHE_TTL).await;
             let _ = self.invalidate_api_caches().await;
 
+            tracing::info!("Successfully cached image: {} -> {}", original_url, cdn_url);
             histogram!("image_upload_duration_seconds").record(start.elapsed().as_secs_f64());
             counter!("image_upload_success_total").increment(1);
         }
@@ -213,23 +219,32 @@ impl CacheImageUseCase {
     }
 
     async fn upload_and_verify(&self, original_url: &str) -> Result<String, String> {
-        let cdn_url = self.upload_to_picser(original_url).await?;
+        let resp = self.upload_to_picser_raw(original_url).await?;
+        let urls = resp.urls.ok_or_else(|| "No URLs in response".to_string())?;
 
+        let jsdelivr = urls.jsdelivr.or(urls.jsdelivr_commit).ok_or_else(|| "No jsdelivr URL".to_string())?;
+        let raw = urls.raw.ok_or_else(|| "No raw URL".to_string())?;
+
+        // 1. Try jsDelivr first with retries
         for attempt in 1..=10 {
-            match self.verify_cdn_url(&cdn_url).await {
-                Ok(true) => return Ok(cdn_url),
-                _ => {
-                    if attempt < 10 {
-                        tokio::time::sleep(std::time::Duration::from_secs(attempt)).await;
-                    }
-                }
+            if self.verify_cdn_url(&jsdelivr).await.unwrap_or(false) {
+                return Ok(jsdelivr);
+            }
+            if attempt < 10 {
+                tokio::time::sleep(std::time::Duration::from_secs(attempt)).await;
             }
         }
 
-        Err("CDN verification failed".to_string())
+        // 2. Fallback to GitHub Raw
+        if self.verify_cdn_url(&raw).await.unwrap_or(false) {
+            tracing::warn!("jsDelivr failed after 10 attempts, falling back to GitHub Raw: {}", raw);
+            return Ok(raw);
+        }
+
+        Err("Both jsDelivr and GitHub Raw verification failed".to_string())
     }
 
-    async fn upload_to_picser(&self, original_url: &str) -> Result<String, String> {
+    async fn upload_to_picser_raw(&self, original_url: &str) -> Result<PicserResponse, String> {
         let bytes = self.client.get(original_url).send().await
             .map_err(|e| e.to_string())?
             .bytes().await
@@ -247,7 +262,7 @@ impl CacheImageUseCase {
 
         for api_url in PICSER_API_ENDPOINTS {
             match tokio::time::timeout(std::time::Duration::from_secs(30), self.perform_upload(api_url, &bytes, &filename)).await {
-                Ok(Ok(resp)) => if let Ok(url) = self.extract_cdn_url(resp) { return Ok(url); },
+                Ok(Ok(resp)) => if resp.success && resp.urls.is_some() { return Ok(resp); },
                 _ => continue,
             }
         }
@@ -279,18 +294,6 @@ impl CacheImageUseCase {
         if !resp.status().is_success() { return Ok(false); }
         let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
         Ok(infer::get(&bytes).map(|k| k.mime_type().starts_with("image/")).unwrap_or(false))
-    }
-
-    fn extract_cdn_url(&self, resp: PicserResponse) -> Result<String, String> {
-        if let Some(urls) = resp.urls {
-            if let Some(url) = urls.jsdelivr_commit { return Ok(url); }
-            if let Some(url) = urls.jsdelivr { return Ok(url); }
-            if let Some(url) = urls.raw { return Ok(url); }
-            if let Some(url) = urls.github { return Ok(url); }
-        }
-        if let Some(url) = resp.url { return Ok(url); }
-        if let Some(url) = resp.github_url { return Ok(url); }
-        Err("No CDN URL found".to_string())
     }
 
     pub fn url_hash(&self, url: &str) -> String {

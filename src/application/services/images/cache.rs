@@ -671,16 +671,16 @@ impl ImageCache {
     ) -> Result<String, String> {
         // Try to extract CDN URL from various response fields
         if let Some(urls) = &response.urls {
+            if let Some(url) = &urls.raw {
+                debug!("ImageCache: Using CDN URL from urls.raw for source: {}", original_url);
+                return Ok(url.clone());
+            }
             if let Some(url) = &urls.jsdelivr_commit {
                 debug!("ImageCache: Using CDN URL from urls.jsdelivr_commit for source: {}", original_url);
                 return Ok(url.clone());
             }
             if let Some(url) = &urls.jsdelivr {
                 debug!("ImageCache: Using CDN URL from urls.jsdelivr for source: {}", original_url);
-                return Ok(url.clone());
-            }
-            if let Some(url) = &urls.raw {
-                debug!("ImageCache: Using CDN URL from urls.raw for source: {}", original_url);
                 return Ok(url.clone());
             }
             if let Some(url) = &urls.github {
