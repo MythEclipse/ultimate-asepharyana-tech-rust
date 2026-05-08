@@ -6,15 +6,16 @@ use axum::{
     response::Response};
 use http::StatusCode;
 use serde::Deserialize;
-use utoipa::ToSchema;
+use utoipa::{ToSchema, IntoParams};
 
 use crate::infra::proxy::fetch_with_proxy;
 use crate::core::error::AppError;
 
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
 pub struct ProxyParams {
-    url: String,
+    /// URL to fetch via proxy
+    pub url: String,
 }
 
 /// Handles GET requests for the proxy endpoint.
@@ -23,6 +24,9 @@ pub struct ProxyParams {
     path = "/api/proxy/croxy",
     tag = "proxy",
     operation_id = "proxy_croxy",
+    params(
+        ProxyParams
+    ),
     responses(
         (status = 200, description = "Handles GET requests for the /api/proxy/croxy endpoint.", body = serde_json::Value),
         (status = 500, description = "Internal Server Error", body = String)

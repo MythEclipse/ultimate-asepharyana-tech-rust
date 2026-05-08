@@ -40,6 +40,12 @@ static IN_FLIGHT: Lazy<DashMap<String, broadcast::Sender<Result<FetchResult, Str
 // Global Blacklist for domains that consistently fail direct fetch (Timeouts, SSL, Cloudflare blocks)
 static FAILED_DOMAINS: Lazy<dashmap::DashSet<String>> = Lazy::new(dashmap::DashSet::new);
 
+const RELAY_ENDPOINTS: &[&str] = &[
+    "https://proxy-bun.vercel.app",
+    "https://opennext-app.superaseph.workers.dev",
+    "https://proxy-bun-mytheclipse8647-orfq73fe.apn.leapcell.dev",
+];
+
 // --- REDIS CACHE WRAPPER START ---
 fn get_fetch_cache_key(slug: &str) -> String {
     format!("fetch:proxy:{slug}")
@@ -152,8 +158,8 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
 
     // 2. Immediate proxy fallback if domain has a known history of brutal timeouts/blocks
     if !domain.is_empty() && FAILED_DOMAINS.contains(&domain) {
-        warn!("[Circuit Breaker] Domain {} is blacklisted from direct-fetch. Routing via Leapcell proxy.", domain);
-        return fetch_from_single_proxy(slug).await;
+        warn!("[Circuit Breaker] Domain {} is blacklisted from direct-fetch. Routing via Relays.", domain);
+        return perform_proxy_chain(slug).await;
     }
 
     // Use shared global HTTP client
@@ -214,10 +220,7 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
 
                 if is_internet_baik_block_page(&text_data) {
                     warn!("Blocked by internetbaik (direct fetch) for {}", slug);
-                    Err(AppError::Other(format!(
-                        "Blocked by internetbaik for {}",
-                        slug
-                    )))
+                    return perform_proxy_chain(slug).await;
                 } else {
                     let result = FetchResult {
                         data: text_data,
@@ -235,7 +238,7 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
                     res.status(),
                     slug
                 );
-                
+
                 // Penalize domain if it throws aggressive Anti-Bot or Gateway Timeout codes
                 if res.status().is_server_error() || res.status() == reqwest::StatusCode::FORBIDDEN || res.status() == reqwest::StatusCode::SERVICE_UNAVAILABLE {
                     if !domain.is_empty() {
@@ -243,7 +246,7 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
                         FAILED_DOMAINS.insert(domain.clone());
                     }
                     error!("{}", error_msg);
-                    return fetch_from_single_proxy(slug).await;
+                    return perform_proxy_chain(slug).await;
                 } else {
                     warn!("{}", error_msg);
                 }
@@ -253,15 +256,15 @@ async fn perform_fetch(slug: &str) -> Result<FetchResult, AppError> {
         Err(e) => {
             let error_msg = format!("Direct fetch failed for {}: {:?}", slug, e);
             warn!("{}", error_msg);
-            
+
             // Hard panic mapping: If reqwest core network/TLS fails, instantly blacklist the domain
             if !domain.is_empty() {
                 warn!("[Circuit Breaker] Blacklisting domain {} due to core network/SSL trace failure", domain);
                 FAILED_DOMAINS.insert(domain.clone());
             }
-            
-            // Fall back seamlessly to Leapcell network proxy instead of throwing fatal transient backoff
-            fetch_from_single_proxy(slug).await
+
+            // Fall back seamlessly to Relay network proxy instead of throwing fatal transient backoff
+            perform_proxy_chain(slug).await
         }
     }
 }
@@ -271,31 +274,39 @@ pub async fn fetch_with_proxy_only(slug: &str) -> Result<FetchResult, AppError> 
         return Ok(cached);
     }
 
-    fetch_from_single_proxy(slug).await
+    perform_proxy_chain(slug).await
 }
 
-async fn fetch_from_single_proxy(slug: &str) -> Result<FetchResult, AppError> {
-    let proxy_url_base = "https://my-fetcher-mytheclipse8647-ap12h7hq.apn.leapcell.dev/fetch?url=";
+async fn perform_proxy_chain(slug: &str) -> Result<FetchResult, AppError> {
+    // 1. Try Relays
+    match fetch_via_relays(slug).await {
+        Ok(res) => return Ok(res),
+        Err(e) => warn!("[ProxyChain] All relays failed for {}: {:?}", slug, e),
+    }
 
+    // 2. Try Browserless as absolute last resort
+    match fetch_via_browserless(slug).await {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            error!("[ProxyChain] Browserless fallback failed for {}: {:?}", slug, e);
+            Err(e)
+        }
+    }
+}
+
+async fn fetch_via_relays(slug: &str) -> Result<FetchResult, AppError> {
     // Use shared client
     let client = http_client().client();
-    let encoded_url = urlencoding::encode(slug);
-    let proxy_url = format!("{}{}", proxy_url_base, encoded_url);
 
-    debug!(
-        "[fetch_from_single_proxy] Attempting to fetch {} via single proxy",
-        slug
-    );
+    for relay in RELAY_ENDPOINTS {
+        debug!("[fetch_via_relays] Attempting to fetch {} via relay {}", slug, relay);
 
-    match client.get(&proxy_url).send().await {
-        Ok(res) => {
-            debug!(
-                "[fetch_from_single_proxy] Proxy fetch response for {}: status={}",
-                slug,
-                res.status()
-            );
-
-            if res.status().is_success() {
+        match client.get(*relay)
+            .header("x-relay-target", slug)
+            .send()
+            .await
+        {
+            Ok(res) if res.status().is_success() => {
                 let content_type = res
                     .headers()
                     .get(reqwest::header::CONTENT_TYPE)
@@ -304,30 +315,51 @@ async fn fetch_from_single_proxy(slug: &str) -> Result<FetchResult, AppError> {
                 let data = res.text().await?;
 
                 let result = FetchResult { data, content_type };
-                debug!(
-                    "[fetch_from_single_proxy] Successfully fetched {} via single proxy",
-                    slug
-                );
+                debug!("[fetch_via_relays] Successfully fetched {} via relay {}", slug, relay);
 
                 if let Err(e) = set_cached_fetch(slug, &result).await {
-                    warn!("Failed to cache proxy result for {}: {:?}", slug, e);
+                    warn!("Failed to cache relay result for {}: {:?}", slug, e);
                 }
 
-                Ok(result)
-            } else {
-                let error_msg = format!(
-                    "Single proxy fetch failed with status {} for {}",
-                    res.status(),
-                    slug
-                );
-                warn!("{}", error_msg);
-                Err(AppError::Other(error_msg))
+                return Ok(result);
+            }
+            Ok(res) => {
+                warn!("[fetch_via_relays] Relay {} returned status {} for {}", relay, res.status(), slug);
+            }
+            Err(e) => {
+                warn!("[fetch_via_relays] Relay {} failed for {}: {:?}", relay, slug, e);
             }
         }
-        Err(e) => {
-            let error_msg = format!("Single proxy fetch failed for {}: {:?}", slug, e);
-            warn!("{}", error_msg);
-            Err(AppError::Other(error_msg))
-        }
     }
+
+    Err(AppError::Other("All relay endpoints failed".to_string()))
+}
+
+async fn fetch_via_browserless(slug: &str) -> Result<FetchResult, AppError> {
+    use crate::browser::pool::get_browser_pool;
+
+    warn!("[Browserless] Falling back to remote browser for {}", slug);
+
+    let pool = get_browser_pool()
+        .ok_or_else(|| AppError::Other("Browser pool not initialized".to_string()))?;
+
+    let tab = pool.get_tab().await
+        .map_err(|e| AppError::Other(format!("Failed to get browser tab: {:?}", e)))?;
+
+    tab.goto(slug).await
+        .map_err(|e| AppError::Other(format!("Browser navigation failed for {}: {:?}", slug, e)))?;
+
+    let data = tab.content().await
+        .map_err(|e| AppError::Other(format!("Failed to get browser content: {:?}", e)))?;
+
+    let result = FetchResult {
+        data,
+        content_type: Some("text/html".to_string()),
+    };
+
+    if let Err(e) = set_cached_fetch(slug, &result).await {
+        warn!("Failed to cache browserless result for {}: {:?}", slug, e);
+    }
+
+    Ok(result)
 }
