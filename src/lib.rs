@@ -5,6 +5,7 @@
 // Core Framework
 // ============================================================================
 pub mod core; // config, error, ratelimit
+pub mod shared; // errors, utils
 
 // ============================================================================
 // Infrastructure

@@ -6,6 +6,9 @@ pub mod config;
 pub mod types;
 pub mod error;
 pub mod ratelimit;
+pub mod models;
+pub mod repositories;
+pub mod use_cases;
 
 pub use config::CONFIG;
 
