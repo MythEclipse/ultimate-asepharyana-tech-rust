@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use crate::core::repositories::ImageRepository;
-use crate::shared::errors::AppError;
 use crate::core::models::image::ImageCache;
 use chrono::Utc;
 use deadpool_redis::Pool as RedisPool;
 use reqwest::Client;
-use tracing::{debug, error, warn};
+use tracing::error;
 use metrics::{counter, histogram};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;

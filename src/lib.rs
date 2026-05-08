@@ -11,6 +11,7 @@ pub mod shared; // errors, utils
 // Infrastructure
 // ============================================================================
 pub mod infra; // redis, http_client, proxy, image_proxy
+pub mod presentation; // API Handlers, DTOs
 
 // ============================================================================
 // Features

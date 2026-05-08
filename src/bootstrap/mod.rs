@@ -114,6 +114,7 @@ impl Application {
 
         // Router
         let app = crate::routes::api::register_routes(Router::new())
+            .merge(crate::presentation::api::anime_handler::router())
             .route("/metrics", axum::routing::get(move || async move { metric_handle.render() }))
             .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", openapi))
             .with_state(app_state.clone())
