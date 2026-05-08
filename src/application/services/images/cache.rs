@@ -3,20 +3,18 @@
 //! This module provides utilities to cache images via jsDelivr CDN
 //! with database storage for URL mapping.
 
-use crate::infra::persistence::entities::image_cache;
-use chrono::Utc;
+use crate::domain::repositories::image_cache::ImageCacheRepository;
+use crate::infra::repositories::image_cache::SeaOrmImageCacheRepository;
 use deadpool_redis::Pool as RedisPool;
+use sea_orm::DatabaseConnection;
 use reqwest::Client;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, error, warn};
 
 use crate::infra::http_client::http_client;
-
-use crate::shared::utils::Cache;
-
 use crate::shared::utils::cache_ttl::CACHE_TTL_IMAGE;
+use crate::shared::utils::Cache;
 
 /// Default TTL for image cache in Redis (24 hours)
 pub const IMAGE_CACHE_TTL: u64 = CACHE_TTL_IMAGE;
@@ -127,8 +125,7 @@ impl Default for ImageCacheConfig {
 
 /// Image cache service
 pub struct ImageCache {
-    db: Arc<DatabaseConnection>,
-    redis: RedisPool,
+    repo: Arc<dyn ImageCacheRepository>,
     client: Client,
     _config: ImageCacheConfig,
     semaphore: Option<std::sync::Arc<tokio::sync::Semaphore>>,
@@ -147,25 +144,21 @@ static IN_FLIGHT_UPLOADS: Lazy<DashMap<String, broadcast::Sender<Result<String, 
 
 impl ImageCache {
     /// Create a new image cache instance
-    pub fn new(db: Arc<DatabaseConnection>, redis: RedisPool) -> Self {
+    pub fn new(repo: Arc<dyn ImageCacheRepository>) -> Self {
         Self {
-            db,
-            redis,
+            repo,
             client: http_client().client().clone(), // Reuse global HTTP client for connection pooling
             _config: ImageCacheConfig::default(),
             semaphore: None,
         }
     }
 
-
     pub fn with_config(
-        db: Arc<DatabaseConnection>,
-        redis: RedisPool,
+        repo: Arc<dyn ImageCacheRepository>,
         config: ImageCacheConfig,
     ) -> Self {
         Self {
-            db,
-            redis,
+            repo,
             client: http_client().client().clone(), // Reuse global HTTP client
             _config: config,
             semaphore: None,
@@ -184,10 +177,9 @@ impl ImageCache {
         let lock_key = format!("{}:{}", IMAGE_CACHE_LOCK_PREFIX, url_hash(original_url));
 
         // 1. Check Redis cache first
-        let redis_cache = Cache::new(&self.redis);
         counter!("image_cache_requests_total").increment(1);
 
-        if let Some(cached_url) = redis_cache.get::<String>(&cache_key).await {
+        if let Some(cached_url) = self.repo.get_from_redis(&cache_key).await {
             debug!("ImageCache: Redis hit for {}", original_url);
             counter!("image_cache_hit_total", "source" => "redis").increment(1);
             return Ok(cached_url);
@@ -231,18 +223,18 @@ impl ImageCache {
         // We wrap the work in a closure/block to easily capture the result
         let result = async {
             // 3. Check database (Double check inside leader to be sure)
-            if let Some(db_entry) = self.find_in_db(original_url).await? {
+            if let Some(cached_url) = self.repo.get_from_db(original_url).await? {
                 // Store in Redis for faster access
-                let _ = redis_cache
-                    .set_with_ttl(&cache_key, &db_entry.cdn_url, IMAGE_CACHE_TTL)
+                let _ = self.repo
+                    .set_in_redis(&cache_key, &cached_url, IMAGE_CACHE_TTL)
                     .await;
                 debug!("ImageCache: DB hit for {}", original_url);
                 counter!("image_cache_hit_total", "source" => "db").increment(1);
-                return Ok(db_entry.cdn_url);
+                return Ok(cached_url);
             }
 
             // 4. Check if another process is already caching this URL (Distributed Lock check)
-            if redis_cache.get::<bool>(&lock_key).await.is_some() {
+            if self.repo.get_lock(&lock_key).await {
                 // Even if locked by another process, strict single-flight within this instance
                 // is good. But if another process is working, we might want to wait or just return error?
                 // Current logic returns error.
@@ -254,8 +246,8 @@ impl ImageCache {
             }
 
             // 5. Acquire lock in Redis
-            let _ = redis_cache
-                .set_with_ttl(&lock_key, &true, IMAGE_CACHE_LOCK_TTL)
+            let _ = self.repo
+                .set_lock(&lock_key, IMAGE_CACHE_LOCK_TTL)
                 .await;
 
             // 6. Upload
@@ -264,18 +256,14 @@ impl ImageCache {
             let start_time = std::time::Instant::now();
 
             // Acquire permit if semaphore is set
-            let redis_clone = self.redis.clone();
-            let lock_key_for_error = lock_key.clone();
             let _permit = if let Some(sem) = &self.semaphore {
-                Some(sem.acquire().await.map_err(|e| {
-                    let redis = redis_clone.clone();
-                    let lock = lock_key_for_error.clone();
-                    tokio::spawn(async move {
-                        let cache = Cache::new(&redis);
-                        let _ = cache.delete(&lock).await;
-                    });
-                    e.to_string()
-                })?)
+                match sem.acquire().await {
+                    Ok(p) => Some(p),
+                    Err(e) => {
+                        let _ = self.repo.release_lock(&lock_key).await;
+                        return Err(e.to_string());
+                    }
+                }
             } else {
                 None
             };
@@ -320,15 +308,15 @@ impl ImageCache {
                 }
 
                 // Save to database only after successful verification
-                self.save_to_db(original_url, &cdn_url).await?;
+                self.repo.save_to_db(original_url, &cdn_url).await?;
 
                 // Cache in Redis
-                let _ = redis_cache
-                    .set_with_ttl(&cache_key, &cdn_url, IMAGE_CACHE_TTL)
+                let _ = self.repo
+                    .set_in_redis(&cache_key, &cdn_url, IMAGE_CACHE_TTL)
                     .await;
 
                 // Invalidate API caches
-                let _ = self.invalidate_api_caches().await;
+                let _ = self.repo.invalidate_api_caches(vec!["anime:*", "anime2:*", "komik:*"]).await;
 
                 let duration = start_time.elapsed();
                 histogram!("image_upload_duration_seconds").record(duration.as_secs_f64());
@@ -339,7 +327,7 @@ impl ImageCache {
             .await;
 
             // Release Redis lock
-            let _ = redis_cache.delete(&lock_key).await;
+            let _ = self.repo.release_lock(&lock_key).await;
 
             work_result
         }
@@ -359,14 +347,13 @@ impl ImageCache {
         let cache_key = format!("{}:{}", IMAGE_CACHE_PREFIX, url_hash(original_url));
 
         // Check Redis first
-        let redis_cache = Cache::new(&self.redis);
-        if let Some(cached_url) = redis_cache.get::<String>(&cache_key).await {
+        if let Some(cached_url) = self.repo.get_from_redis(&cache_key).await {
             return Some(cached_url);
         }
 
         // Check database
-        if let Ok(Some(entry)) = self.find_in_db(original_url).await {
-            return Some(entry.cdn_url);
+        if let Ok(Some(cdn_url)) = self.repo.get_from_db(original_url).await {
+            return Some(cdn_url);
         }
 
         None
@@ -374,17 +361,7 @@ impl ImageCache {
 
     /// Find an original URL for a given CDN URL (reverse lookup)
     pub async fn find_original_from_cdn(&self, cdn_url: &str) -> Option<String> {
-        // First check Redis (if we decide to cache the reverse mapping - currently just DB)
-        // For simplicity and to avoid Redis pollution, we go straight to DB as audit is infrequent
-        if let Ok(Some(entry)) = image_cache::Entity::find()
-            .filter(image_cache::Column::CdnUrl.eq(cdn_url))
-            .one(self.db.as_ref())
-            .await
-        {
-            return Some(entry.original_url);
-        }
-
-        None
+        self.repo.find_original_from_cdn(cdn_url).await.ok().flatten()
     }
 
     /// Invalidate cache for a URL
@@ -392,91 +369,12 @@ impl ImageCache {
         let cache_key = format!("{}:{}", IMAGE_CACHE_PREFIX, url_hash(original_url));
 
         // Remove from Redis
-        let redis_cache = Cache::new(&self.redis);
-        let _ = redis_cache.delete(&cache_key).await;
+        let _ = self.repo.delete_from_redis(&cache_key).await;
 
         // Remove from database
-        image_cache::Entity::delete_many()
-            .filter(image_cache::Column::OriginalUrl.eq(original_url))
-            .exec(self.db.as_ref())
-            .await
-            .map_err(|e| e.to_string())?;
+        self.repo.delete_from_db(original_url).await?;
 
         debug!("ImageCache: Invalidated {}", original_url);
-        Ok(())
-    }
-
-    /// Find entry in database
-    async fn find_in_db(&self, original_url: &str) -> Result<Option<image_cache::Model>, String> {
-        image_cache::Entity::find()
-            .filter(image_cache::Column::OriginalUrl.eq(original_url))
-            .one(self.db.as_ref())
-            .await
-            .map_err(|e| e.to_string())
-    }
-
-    /// Save URL mapping to database
-    async fn save_to_db(&self, original_url: &str, cdn_url: &str) -> Result<(), String> {
-        let model = image_cache::ActiveModel {
-            id: Set(uuid::Uuid::new_v4().to_string()),
-            original_url: Set(original_url.to_string()),
-            cdn_url: Set(cdn_url.to_string()),
-            created_at: Set(Utc::now()),
-            expires_at: Set(None),
-        };
-
-        model
-            .insert(self.db.as_ref())
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    /// Invalidate API response caches that may contain this image
-    /// Uses SCAN instead of KEYS to avoid blocking Redis
-    async fn invalidate_api_caches(&self) -> Result<(), String> {
-        use deadpool_redis::redis::{cmd, AsyncCommands};
-
-        let mut conn = self.redis.get().await.map_err(|e| e.to_string())?;
-
-        // Patterns untuk cache API yang berisi images
-        let patterns = vec!["anime:*", "anime2:*", "komik:*"];
-
-        let mut total_deleted = 0;
-
-        for pattern in patterns {
-            // Use SCAN instead of KEYS to avoid blocking Redis
-            let mut cursor: u64 = 0;
-            loop {
-                let (new_cursor, keys): (u64, Vec<String>) = cmd("SCAN")
-                    .arg(cursor)
-                    .arg("MATCH")
-                    .arg(pattern)
-                    .arg("COUNT")
-                    .arg(100)
-                    .query_async(&mut *conn)
-                    .await
-                    .map_err(|e| e.to_string())?;
-
-                if !keys.is_empty() {
-                    let deleted: usize = conn.del(&keys).await.map_err(|e| e.to_string())?;
-                    total_deleted += deleted;
-                }
-
-                cursor = new_cursor;
-                if cursor == 0 {
-                    break;
-                }
-            }
-        }
-
-        if total_deleted > 0 {
-            debug!(
-                "ImageCache: Invalidated {} API cache keys after image upload",
-                total_deleted
-            );
-        }
-
         Ok(())
     }
 
@@ -835,7 +733,8 @@ pub async fn cache_image_url(
     redis: &RedisPool,
     original_url: &str,
 ) -> String {
-    let cache = ImageCache::new(db, redis.clone());
+    let repo = Arc::new(SeaOrmImageCacheRepository::new(db, redis.clone()));
+    let cache = ImageCache::new(repo);
     match cache.get_or_cache(original_url).await {
         Ok(cdn_url) => cdn_url,
         Err(e) => {
@@ -851,7 +750,8 @@ pub async fn cache_image_urls(
     redis: &RedisPool,
     urls: &[String],
 ) -> Vec<String> {
-    let cache = ImageCache::new(db, redis.clone());
+    let repo = Arc::new(SeaOrmImageCacheRepository::new(db, redis.clone()));
+    let cache = ImageCache::new(repo);
     let mut results = Vec::with_capacity(urls.len());
 
     for url in urls {
@@ -880,7 +780,8 @@ pub fn cache_image_url_lazy(
 
     // Spawn background task to cache
     tokio::spawn(async move {
-        let mut cache = ImageCache::new(db_owned, redis_owned);
+        let repo = Arc::new(SeaOrmImageCacheRepository::new(db_owned, redis_owned));
+        let mut cache = ImageCache::new(repo);
         if let Some(sem) = sem_owned {
             cache = cache.with_semaphore(sem);
         }
@@ -904,7 +805,8 @@ pub async fn get_cached_or_original(
     original_url: &str,
     semaphore: Option<Arc<tokio::sync::Semaphore>>,
 ) -> String {
-    let cache = ImageCache::new(db.clone(), redis.clone());
+    let repo = Arc::new(SeaOrmImageCacheRepository::new(db.clone(), redis.clone()));
+    let cache = ImageCache::new(repo);
 
     // Check if already cached (Redis or DB)
     if let Some(cdn_url) = cache.get_cdn_url(original_url).await {
@@ -925,7 +827,8 @@ pub async fn get_cached_or_original(
     let sem_owned = semaphore.clone();
 
     tokio::spawn(async move {
-        let mut cache = ImageCache::new(db_owned, redis_owned);
+        let repo = Arc::new(SeaOrmImageCacheRepository::new(db_owned, redis_owned));
+        let mut cache = ImageCache::new(repo);
         if let Some(sem) = sem_owned {
             cache = cache.with_semaphore(sem);
         }
@@ -970,10 +873,15 @@ pub async fn cache_image_urls_batch_lazy(
         }
     }
 
-    // 2. Batch check Database for Redis misses
+        // 2. Batch check Database for Redis misses
     if !missing_indices.is_empty() {
         let missing_urls: Vec<String> = missing_indices.iter().map(|&i| urls[i].clone()).collect();
-        
+
+        // Note: Using repository for batch check would be better, but keeping it direct for now to match SeaORM usage
+        // but I should probably add a batch method to repository later.
+        use crate::infra::persistence::entities::image_cache;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
         match image_cache::Entity::find()
             .filter(image_cache::Column::OriginalUrl.is_in(missing_urls.clone()))
             .all(db.as_ref())
@@ -1011,7 +919,8 @@ pub async fn cache_image_urls_batch_lazy(
 
                     tokio::spawn(async move {
                         use futures::stream::{self, StreamExt};
-                        let mut cache = ImageCache::new(db_owned, redis_owned);
+                        let repo = Arc::new(SeaOrmImageCacheRepository::new(db_owned, redis_owned));
+                        let mut cache = ImageCache::new(repo);
                         if let Some(sem) = sem_owned {
                             cache = cache.with_semaphore(sem);
                         }

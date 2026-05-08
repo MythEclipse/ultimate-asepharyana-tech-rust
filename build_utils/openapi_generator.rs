@@ -30,7 +30,7 @@ pub fn generate_openapi_spec(
     }
 
     // Core schemas
-    schemas_list.insert("crate::core::types::ApiResponse<String>".to_string());
+    schemas_list.insert("crate::application::types::ApiResponse<String>".to_string());
 
     let schemas_code: Vec<String> = schemas_list.into_iter().map(|s| format!("{},", s)).collect();
 

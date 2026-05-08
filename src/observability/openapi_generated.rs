@@ -81,7 +81,7 @@ mod handler_mod_34 { pub use crate::presentation::api::anime_handler::anime_inde
     ),
     components(
         schemas(
-            crate::core::types::ApiResponse<String>,
+            crate::application::types::ApiResponse<String>,
             crate::presentation::api::anime2::detail::slug::AnimeDetailData,
             crate::presentation::api::anime2::detail::slug::DetailResponse,
             crate::presentation::api::anime2::detail::slug::DownloadItem,

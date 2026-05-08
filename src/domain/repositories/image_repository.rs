@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::core::models::image::ImageCache;
+use crate::domain::entities::image::ImageCache;
 use crate::shared::errors::AppError;
 
 #[async_trait]

@@ -10,7 +10,7 @@ use tracing::{debug, error, warn};
 use crate::shared::utils::cache_ttl::CACHE_TTL_VERY_SHORT;
 use crate::infra::http_client::http_client;
 use crate::infra::redis::get_redis_conn;
-use crate::core::error::AppError;
+use crate::application::error::AppError;
 use crate::shared::utils::http::common_headers;
 use crate::shared::utils::http::is_internet_baik_block_page;
 

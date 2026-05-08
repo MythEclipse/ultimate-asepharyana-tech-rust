@@ -1,4 +1,4 @@
-use crate::core::error::AppError;
+use crate::application::error::AppError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},

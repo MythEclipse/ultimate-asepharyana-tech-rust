@@ -10,7 +10,7 @@ use serde_json::json;
 use tracing::info;
 
 // Import shared models and parsers
-use crate::core::models::anime::{OngoingAnimeItemWithScore, Pagination};
+use crate::domain::entities::anime::{OngoingAnimeItemWithScore, Pagination};
 use crate::scraping::anime2 as parsers;
 
 
@@ -87,7 +87,7 @@ pub async fn slug(
 
             // Convert all poster URLs to CDN URLs concurrently
             let posters: Vec<String> = data.iter().map(|i| i.poster.clone()).collect();
-            crate::core::services::images::cache::cache_image_urls_batch_lazy(
+            crate::application::services::images::cache::cache_image_urls_batch_lazy(
                 app_state.db.clone(),
                 &app_state.redis_pool,
                 posters,

@@ -1,4 +1,4 @@
-use crate::core::error::AppError;
+use crate::application::error::AppError;
 use crate::shared::utils::http::common_image_headers;
 use bytes::Bytes;
 use reqwest::Client;

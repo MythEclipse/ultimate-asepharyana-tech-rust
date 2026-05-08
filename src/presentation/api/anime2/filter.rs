@@ -4,7 +4,7 @@ use crate::presentation::state::AppState;
 use crate::shared::utils::api_response::{internal_err, ApiResult, ApiResponse};
 use crate::shared::utils::{default_backoff, transient, Cache};
 use crate::infra::proxy::fetch_with_proxy;
-use crate::core::models::anime::{FilterAnimeItem, Pagination};
+use crate::domain::entities::anime::{FilterAnimeItem, Pagination};
 use axum::extract::{Query, State};
 use backoff::future::retry;
 use once_cell::sync::Lazy;
@@ -114,7 +114,7 @@ pub async fn filter(
 
             // Convert all poster URLs to CDN URLs concurrently
             let posters: Vec<String> = data.iter().map(|i| i.poster.clone()).collect();
-            let cached_posters = crate::core::services::images::cache::cache_image_urls_batch_lazy(
+            let cached_posters = crate::application::services::images::cache::cache_image_urls_batch_lazy(
                 app_state.db.clone(),
                 &app_state.redis_pool,
                 posters,

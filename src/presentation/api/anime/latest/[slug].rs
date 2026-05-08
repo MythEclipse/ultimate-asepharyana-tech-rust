@@ -115,7 +115,7 @@ pub async fn latest(
             let redis = app_state.redis_pool.clone();
 
             let posters: Vec<String> = anime_list.iter().map(|i| i.poster.clone()).collect();
-            let cached_posters = crate::core::services::images::cache::cache_image_urls_batch_lazy(
+            let cached_posters = crate::application::services::images::cache::cache_image_urls_batch_lazy(
                 db,
                 &redis,
                 posters,

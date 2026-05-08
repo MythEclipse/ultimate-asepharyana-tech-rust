@@ -4,7 +4,8 @@
 // ============================================================================
 // Core Framework
 // ============================================================================
-pub mod core;
+pub mod domain;
+pub mod application;
 pub mod shared;
 pub mod infra;
 pub mod presentation;

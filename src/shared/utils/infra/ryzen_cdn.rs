@@ -1,4 +1,4 @@
-use crate::core::error::AppError;
+use crate::application::error::AppError;
 use infer; // For file type detection
 use reqwest::{multipart, Client};
 use serde::{Deserialize, Serialize};

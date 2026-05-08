@@ -78,10 +78,10 @@ impl IntoResponse for AppError {
             _ => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
-        // Note: crate::core::types needs to be available. 
+        // Note: crate::application::types needs to be available. 
         // If not, we might need to adjust this line or ensure types are there.
         // Since we are validating structure, let's assume types is in core/types.rs
-        let body = axum::Json(crate::core::types::ApiResponse::<()>::error(error_message));
+        let body = axum::Json(crate::application::types::ApiResponse::<()>::error(error_message));
         (status, body).into_response()
     }
 }

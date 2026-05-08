@@ -9,7 +9,7 @@ use serde_json::json;
 use tracing::info;
 
 // Import shared models and parsers
-use crate::core::models::anime::{LatestAnimeItem, Pagination};
+use crate::domain::entities::anime::{LatestAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 use crate::scraping::anime::cache as cache_utils;
 

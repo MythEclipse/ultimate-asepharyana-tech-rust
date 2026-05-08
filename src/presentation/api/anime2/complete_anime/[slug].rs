@@ -15,7 +15,7 @@ use tracing::info;
 // Internal imports
 
 // Import shared models and parsers
-use crate::core::models::anime::{CompleteAnimeItem, Pagination};
+use crate::domain::entities::anime::{CompleteAnimeItem, Pagination};
 use crate::scraping::anime2 as parsers;
 
 
@@ -107,7 +107,7 @@ pub async fn slug(
             let db = app_state.db.clone();
             let redis = app_state.redis_pool.clone();
 
-            let cached_posters = crate::core::services::images::cache::cache_image_urls_batch_lazy(
+            let cached_posters = crate::application::services::images::cache::cache_image_urls_batch_lazy(
                 db,
                 &redis,
                 posters,

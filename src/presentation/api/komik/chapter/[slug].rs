@@ -3,7 +3,7 @@ use axum::Router;
 use std::sync::Arc;
 use crate::presentation::state::AppState;
 use crate::shared::utils::{internal_err, Cache, fetch_html_with_retry, parse_html};
-use crate::core::services::images::cache::cache_image_urls_batch_lazy;
+use crate::application::services::images::cache::cache_image_urls_batch_lazy;
 use crate::shared::utils::scraping::{selector, text, attr};
 use crate::scraping::urls::get_komik_url;
 use axum::http::StatusCode;

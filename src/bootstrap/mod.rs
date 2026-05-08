@@ -8,7 +8,7 @@ use tower_http::compression::{CompressionLayer, CompressionLevel};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
 
-use crate::core::config::CONFIG;
+use crate::application::config::CONFIG;
 use crate::infra::redis::get_redis_conn;
 use crate::presentation::state::AppState;
 use utoipa::OpenApi;

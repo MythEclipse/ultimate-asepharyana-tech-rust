@@ -3,10 +3,10 @@ use axum::response::IntoResponse;
 use axum::{Json, Router};
 use std::sync::Arc;
 use crate::presentation::state::AppState;
-use crate::core::use_cases::CacheImageUseCase;
+use crate::application::use_cases::CacheImageUseCase;
 use crate::infra::repositories::mysql_image_repository::MySqlImageRepository;
 use crate::shared::errors::AppError;
-use crate::core::types::ApiResponse;
+use crate::application::types::ApiResponse;
 use crate::scraping::urls::get_otakudesu_url;
 use crate::shared::utils::{parse_html, Cache, fetch_html_with_retry, text_from_or, attr_from_or, selector, extract_slug, attr_from};
 use serde::{Deserialize, Serialize};
@@ -191,5 +191,5 @@ fn parse_complete_anime(
 }
 
 pub fn register_routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/api/anime", axum::routing::get(anime_index))
+    router.route("/api/anime_handler", axum::routing::get(anime_index))
 }

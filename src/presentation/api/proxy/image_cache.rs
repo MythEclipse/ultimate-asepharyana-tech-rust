@@ -8,7 +8,8 @@ use axum::{extract::State, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::core::services::images::cache::ImageCache;
+use crate::application::services::images::cache::ImageCache;
+use crate::domain::repositories::image_cache::ImageCacheRepository;
 use crate::events::bus::ImageRepaired;
 
 pub const ENDPOINT_METHOD: &str = "post";
@@ -80,7 +81,11 @@ pub async fn image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageCacheRequest>,
 ) -> impl IntoResponse {
-    let cache = ImageCache::new(state.db.clone(), state.redis_pool.clone())
+    let repo: Arc<dyn ImageCacheRepository> = Arc::new(crate::infra::repositories::image_cache::SeaOrmImageCacheRepository::new(
+        state.db.clone(),
+        state.redis_pool.clone(),
+    ));
+    let cache = ImageCache::new(repo)
         .with_semaphore(state.image_processing_semaphore.clone());
 
     // Check if already cached
@@ -102,7 +107,8 @@ pub async fn image_cache(
         let semaphore = state.image_processing_semaphore.clone();
 
         tokio::spawn(async move {
-            let cache = ImageCache::new(db, redis)
+            let repo: Arc<dyn ImageCacheRepository> = Arc::new(crate::infra::repositories::image_cache::SeaOrmImageCacheRepository::new(db, redis));
+            let cache = ImageCache::new(repo)
                 .with_semaphore(semaphore);
             match cache.get_or_cache(&url).await {
                 Ok(cdn_url) => {
@@ -148,7 +154,11 @@ pub async fn image_cache_batch(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ImageCacheBatchRequest>,
 ) -> impl IntoResponse {
-    let cache = ImageCache::new(state.db.clone(), state.redis_pool.clone());
+    let repo: Arc<dyn ImageCacheRepository> = Arc::new(crate::infra::repositories::image_cache::SeaOrmImageCacheRepository::new(
+        state.db.clone(),
+        state.redis_pool.clone(),
+    ));
+    let cache = ImageCache::new(repo);
     let mut results = Vec::with_capacity(req.urls.len());
 
     for url in req.urls {
@@ -190,7 +200,11 @@ pub async fn delete_image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<DeleteImageCacheRequest>,
 ) -> impl IntoResponse {
-    let cache = ImageCache::new(state.db.clone(), state.redis_pool.clone());
+    let repo: Arc<dyn ImageCacheRepository> = Arc::new(crate::infra::repositories::image_cache::SeaOrmImageCacheRepository::new(
+        state.db.clone(),
+        state.redis_pool.clone(),
+    ));
+    let cache = ImageCache::new(repo);
     
     match cache.invalidate(&req.url).await {
         Ok(_) => Json(DeleteImageCacheResponse {
@@ -232,7 +246,11 @@ pub async fn audit_image_cache(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AuditImageCacheRequest>,
 ) -> impl IntoResponse {
-    let cache = ImageCache::new(state.db.clone(), state.redis_pool.clone())
+    let repo: Arc<dyn ImageCacheRepository> = Arc::new(crate::infra::repositories::image_cache::SeaOrmImageCacheRepository::new(
+        state.db.clone(),
+        state.redis_pool.clone(),
+    ));
+    let cache = ImageCache::new(repo)
         .with_semaphore(state.image_processing_semaphore.clone());
 
     let mut cdn_url_opt = cache.get_cdn_url(&req.url).await;

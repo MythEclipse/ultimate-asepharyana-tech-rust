@@ -9,7 +9,7 @@ use serde::Deserialize;
 use utoipa::{ToSchema, IntoParams};
 
 use crate::infra::proxy::fetch_with_proxy;
-use crate::core::error::AppError;
+use crate::application::error::AppError;
 
 
 #[derive(Debug, Deserialize, ToSchema, IntoParams)]

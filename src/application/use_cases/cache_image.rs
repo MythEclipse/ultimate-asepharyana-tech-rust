@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use crate::core::repositories::ImageRepository;
-use crate::core::models::image::ImageCache;
+use crate::domain::repositories::ImageRepository;
+use crate::domain::entities::image::ImageCache;
 use chrono::Utc;
 use deadpool_redis::Pool as RedisPool;
 use reqwest::Client;
